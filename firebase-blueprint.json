@@ -81,6 +81,17 @@
     "grades": {
       "schema": "Grade",
       "description": "Stored musical scores (Grades)"
+    },
+    "config/naipes/lista": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "naipe": { "type": "string" },
+          "repertorios": { "type": "array", "items": { "type": "string" } },
+          "integrantes": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "description": "Subcollection of instrument category documents (naipes)"
     }
   }
 }

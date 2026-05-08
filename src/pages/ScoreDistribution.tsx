@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileStack, Upload, Plus, X, Search, FileText, Loader2, CheckCircle2 } from 'lucide-react';
-import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { FileStack, Upload, Plus, X, Search, FileText, Loader2, CheckCircle2, Folder, ChevronDown } from 'lucide-react';
+import { collection, addDoc, getDocs, query, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import * as pdfjs from 'pdfjs-dist';
+import { PDFDocument } from 'pdf-lib';
 
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -19,6 +20,11 @@ interface Grade {
   repertorio: string;
   pdfUrl: string;
   createdAt: string;
+}
+
+interface Naipe {
+  id: string;
+  nome: string;
 }
 
 interface PDFThumbnailProps {
@@ -61,11 +67,16 @@ const PDFThumbnail: React.FC<PDFThumbnailProps> = ({ pageNumber, pdf, onSelect, 
     <div 
       onClick={() => onSelect(pageNumber)}
       className={cn(
-        "flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border-2 transition-all p-1 w-16 md:w-20 bg-white shadow-sm",
+        "flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border-2 transition-all p-1 w-16 md:w-20 bg-white shadow-sm relative",
         isSelected ? "border-brand ring-4 ring-brand/5 scale-105 z-10" : "border-transparent hover:border-slate-200 hover:scale-102"
       )}
     >
       <canvas ref={canvasRef} className="rounded-lg w-full h-auto" />
+      {isSelected && (
+        <div className="absolute top-1 right-1 bg-brand text-white rounded-full p-0.5 shadow-sm transform scale-75 md:scale-90 origin-top-right">
+          <CheckCircle2 size={12} strokeWidth={4} />
+        </div>
+      )}
       <p className={cn(
         "text-[7px] font-black text-center mt-1 uppercase tracking-tighter",
         isSelected ? "text-brand" : "text-slate-400"
@@ -155,15 +166,19 @@ export function ScoreDistribution() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [grades, setGrades] = useState<Grade[]>([]);
+  const [naipes, setNaipes] = useState<Naipe[]>([]);
   const [selectedGradeId, setSelectedGradeId] = useState<string>('');
+  const [selectedNaipeId, setSelectedNaipeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // PDF Viewer State
   const [pdfDoc, setPdfDoc] = useState<pdfjs.PDFDocumentProxy | null>(null);
-  const [selectedPageNumber, setSelectedPageNumber] = useState(1);
+  const [selectedPages, setSelectedPages] = useState<number[]>([]);
+  const [currentViewPage, setCurrentViewPage] = useState(1);
   const [loadingPdf, setLoadingPdf] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   // Form states
   const [isUploading, setIsUploading] = useState(false);
@@ -174,6 +189,7 @@ export function ScoreDistribution() {
 
   useEffect(() => {
     fetchGrades();
+    fetchNaipes();
   }, []);
 
   const fetchGrades = async () => {
@@ -193,9 +209,30 @@ export function ScoreDistribution() {
     }
   };
 
+  const fetchNaipes = async () => {
+    try {
+      // Estrutura: config (col) -> naipes (doc) -> lista (subcol)
+      const querySnapshot = await getDocs(collection(db, 'config', 'naipes', 'lista'));
+      const naipesList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        nome: doc.data().naipe || doc.id
+      })) as Naipe[];
+      
+      setNaipes(naipesList);
+    } catch (error) {
+      console.error("Erro ao carregar naipes:", error);
+    }
+  };
+
+  const toggleNaipeSelection = (id: string) => {
+    setSelectedNaipeId(prev => prev === id ? null : id);
+  };
+
   const loadPdf = async (url: string) => {
     setLoadingPdf(true);
     setPdfDoc(null);
+    setSelectedPages([]);
+    setCurrentViewPage(1);
     try {
       // Usamos diretamente o getDocument. Se falhar por CORS, o erro será capturado.
       const loadingTask = pdfjs.getDocument({
@@ -205,7 +242,6 @@ export function ScoreDistribution() {
       
       const pdf = await loadingTask.promise;
       setPdfDoc(pdf);
-      setSelectedPageNumber(1);
     } catch (error: any) {
       console.error("Erro ao carregar PDF:", error);
       
@@ -217,6 +253,61 @@ export function ScoreDistribution() {
       }
     } finally {
       setLoadingPdf(false);
+    }
+  };
+
+  const togglePageSelection = (pageNumber: number) => {
+    setCurrentViewPage(pageNumber);
+    setSelectedPages(prev => 
+      prev.includes(pageNumber) 
+        ? prev.filter(p => p !== pageNumber) 
+        : [...prev, pageNumber]
+    );
+  };
+
+  const handleAssign = async () => {
+    if (!selectedGrade || selectedPages.length === 0 || !selectedNaipeId) return;
+
+    setIsAssigning(true);
+    try {
+      // 1. Obter o PDF original em binário
+      const response = await fetch(selectedGrade.pdfUrl);
+      const originalPdfBytes = await response.arrayBuffer();
+
+      // 2. Usar pdf-lib para extrair as páginas selecionadas
+      const pdfDoc = await PDFDocument.load(originalPdfBytes);
+      const newPdfDoc = await PDFDocument.create();
+      
+      // As páginas selecionadas estão em base 1, pdf-lib usa base 0
+      const pagesToCopy = selectedPages
+        .sort((a, b) => a - b)
+        .map(p => p - 1);
+      
+      const copiedPages = await newPdfDoc.copyPages(pdfDoc, pagesToCopy);
+      copiedPages.forEach(page => newPdfDoc.addPage(page));
+
+      // 3. Gerar a string base64
+      const pdfBase64 = await newPdfDoc.saveAsBase64({ dataUri: true });
+
+      // 4. Salvar no Firestore na subcoleção 'repertorios' do naipe selecionado
+      // Caminho: config/naipes/lista/[selectedNaipeId]/repertorios
+      const repertorioRef = collection(db, 'config', 'naipes', 'lista', selectedNaipeId, 'repertorios');
+      
+      await addDoc(repertorioRef, {
+        repertorio: selectedGrade.repertorio,
+        partituras: pdfBase64,
+        titulo: selectedGrade.titulo,
+        assignedAt: new Date().toISOString()
+      });
+
+      alert("🎉 Partitura atribuída com sucesso!");
+      setSelectedPages([]);
+      setSelectedNaipeId(null);
+    } catch (error) {
+      console.error("Erro ao atribuir partitura:", error);
+      alert("Erro ao processar e atribuir partitura.");
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -285,160 +376,236 @@ export function ScoreDistribution() {
         </div>
       </header>
 
-      {/* Main Controls */}
-      <div className="max-w-2xl mx-auto w-full transition-all">
-        {/* Selection Area */}
-        <div className="bg-white p-5 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4 md:space-y-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Selecionar música</label>
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={() => navigate('/gerenciamento-grades')}
-                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-brand transition-colors"
-                >
-                  <FileStack size={14} className="md:w-4 md:h-4" />
-                </button>
-                <button 
-                  onClick={() => setIsModalOpen(true)}
-                  className="p-1 hover:bg-slate-100 rounded-lg text-brand transition-colors flex items-center gap-1 group"
-                >
-                  <Plus size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase tracking-tighter md:opacity-0 md:group-hover:opacity-100 transition-opacity">Nova Grade</span>
-                </button>
+      {/* Main Content Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Coluna da Esquerda - Seleção e PDF */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Selecionar Música - Discreto */}
+          <div className="bg-white p-4 md:p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-brand/5 text-brand rounded-xl flex items-center justify-center shrink-0">
+                <FileText size={20} />
+              </div>
+              <div className="space-y-0.5 flex-1 min-w-0">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none ml-1">Música Grade</h3>
+                <div className="relative group mt-1">
+                  <select 
+                    value={selectedGradeId}
+                    onChange={(e) => setSelectedGradeId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-100 hover:border-slate-200 hover:bg-white rounded-xl py-2 px-3 pr-8 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-brand/20 transition-all text-sm appearance-none cursor-pointer truncate"
+                  >
+                    <option value="">Selecionar partitura...</option>
+                    {grades.map((grade) => (
+                      <option key={grade.id} value={grade.id}>{grade.titulo}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <ChevronDown size={14} />
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input 
-                type="text" 
-                placeholder="Buscar ou selecionar música..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 md:py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 transition-all shadow-inner"
-              />
-              
-              {searchQuery && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-20 max-h-60 overflow-y-auto overflow-x-hidden">
-                  {filteredGrades.length > 0 ? (
-                    filteredGrades.map(grade => (
-                      <button
-                        key={grade.id}
-                        onClick={() => {
-                          setSelectedGradeId(grade.id);
-                          setSearchQuery('');
-                        }}
-                        className="w-full text-left px-5 py-3 md:px-6 md:py-4 hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0"
-                      >
-                        <FileText size={16} className="text-slate-400 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-700 text-sm truncate">{grade.titulo}</p>
-                          <p className="text-[8px] md:text-[9px] text-slate-400 uppercase font-black">Disponível</p>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-6 py-8 text-center">
-                      <p className="text-xs font-bold text-slate-400">Nenhuma música encontrada.</p>
-                      <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="mt-2 text-[10px] font-black text-brand uppercase tracking-widest hover:underline"
-                      >
-                        Adicionar "{searchQuery}" agora?
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold px-4 py-2 rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-2 transition-all"
+            >
+              <Plus size={14} />
+              Nova Música
+            </button>
           </div>
 
-          {selectedGrade && (
+          {/* Manipulação do PDF */}
+          {selectedGrade ? (
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="p-4 md:p-6 bg-brand/5 border border-brand/10 rounded-2xl flex items-center justify-between"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
             >
-              <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-xl flex items-center justify-center text-brand shadow-sm shrink-0">
-                  <FileText size={20} className="md:w-6 md:h-6" />
+              {loadingPdf ? (
+                <div className="bg-slate-50 py-20 rounded-[32px] border border-slate-200 flex flex-col items-center justify-center gap-4">
+                   <Loader2 size={32} className="animate-spin text-brand/20" />
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Carregando PDF...</p>
                 </div>
-                <div className="overflow-hidden">
-                  <h3 className="font-bold text-slate-800 tracking-tight text-sm md:text-base truncate">{selectedGrade.titulo}</h3>
-                  <p className="text-[8px] md:text-[9px] font-black text-brand uppercase tracking-widest leading-none">Selecionada</p>
+              ) : pdfDoc ? (
+                <div className="space-y-6">
+                   {/* Thumbnail Navigation */}
+                   <div className="bg-white p-4 rounded-[28px] border border-slate-200 shadow-sm relative">
+                      <div className="flex items-center justify-between mb-4 px-2">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Páginas</h3>
+                        <div className="flex items-center gap-2">
+                          {selectedPages.length > 0 && (
+                            <span className="bg-brand text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1">
+                              {selectedPages.length}
+                              <span className="hidden md:inline">Selecionada{selectedPages.length > 1 ? 's' : ''}</span>
+                              <CheckCircle2 size={10} className="md:hidden" strokeWidth={3} />
+                            </span>
+                          )}
+                          <span className="text-[10px] font-bold text-slate-400">{currentViewPage} de {pdfDoc.numPages}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                         <div 
+                            onMouseDown={(e) => {
+                              const container = e.currentTarget;
+                              container.style.cursor = 'grabbing';
+                              container.style.userSelect = 'none';
+                              const startX = e.pageX - container.offsetLeft;
+                              const scrollLeft = container.scrollLeft;
+    
+                              const onMouseMove = (e: MouseEvent) => {
+                                const x = e.pageX - container.offsetLeft;
+                                const walk = (x - startX) * 2; // Velocidade do scroll
+                                container.scrollLeft = scrollLeft - walk;
+                              };
+    
+                              const onMouseUp = () => {
+                                container.style.cursor = 'grab';
+                                container.style.removeProperty('user-select');
+                                window.removeEventListener('mousemove', onMouseMove);
+                                window.removeEventListener('mouseup', onMouseUp);
+                              };
+    
+                              window.addEventListener('mousemove', onMouseMove);
+                              window.addEventListener('mouseup', onMouseUp);
+                            }}
+                            className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-2 px-1 cursor-grab active:cursor-grabbing select-none"
+                         >
+                            {Array.from({ length: pdfDoc.numPages }).map((_, i) => (
+                              <PDFThumbnail 
+                                key={i + 1}
+                                pageNumber={i + 1}
+                                pdf={pdfDoc}
+                                isSelected={selectedPages.includes(i + 1)}
+                                onSelect={togglePageSelection}
+                              />
+                            ))}
+                         </div>
+                      </div>
+                   </div>
+    
+                   {/* Large Preview */}
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Visualização</h3>
+                        <div className="bg-brand/5 border border-brand/10 px-3 py-1 rounded-full">
+                           <p className="text-[9px] font-black text-brand uppercase tracking-widest">Página {currentViewPage}</p>
+                        </div>
+                      </div>
+                      <PDFPageRenderer 
+                        pdf={pdfDoc} 
+                        pageNumber={currentViewPage} 
+                      />
+                   </div>
                 </div>
-              </div>
-              <button 
-                 onClick={() => setSelectedGradeId('')}
-                 className="p-1.5 md:p-2 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 transition-colors shrink-0"
-              >
-                <X size={16} className="md:w-[18px] md:h-[18px]" />
-              </button>
+              ) : (
+                <div className="bg-red-50 p-8 rounded-[32px] border border-red-100 text-center">
+                  <p className="text-sm font-bold text-red-500">Erro ao carregar pré-visualização do PDF.</p>
+                </div>
+              )}
             </motion.div>
+          ) : (
+            <div className="bg-slate-50/50 p-20 rounded-[40px] border border-dashed border-slate-200 text-center space-y-4">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm text-slate-300">
+                <FileStack size={32} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-slate-700">Selecione uma Música</h3>
+                <p className="text-xs text-slate-400 max-w-[200px] mx-auto uppercase tracking-wider font-medium">Escolha uma partitura acima para começar a distribuir as páginas.</p>
+              </div>
+            </div>
           )}
         </div>
+
+        {/* Coluna da Direita - Naipes e Ações */}
+        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-6"
+          >
+            {/* Pastas dos Naipes */}
+            <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-50 bg-slate-50/50">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Pastas dos Naipes</h3>
+                <p className="text-xs font-bold text-slate-600 mt-1">Selecione o destino para as páginas</p>
+              </div>
+              
+              <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar">
+                {naipes.length > 0 ? (
+                  naipes.map((naipe) => (
+                    <button
+                      key={naipe.id}
+                      onClick={() => toggleNaipeSelection(naipe.id)}
+                      className={cn(
+                        "w-full flex items-center gap-4 p-4 rounded-2xl border transition-all group text-left relative",
+                        selectedNaipeId === naipe.id 
+                          ? "bg-brand/5 border-brand ring-4 ring-brand/5 shadow-sm" 
+                          : "bg-white border-transparent hover:bg-slate-50 hover:border-slate-100"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                        selectedNaipeId === naipe.id
+                          ? "bg-brand text-white scale-110"
+                          : "bg-brand/5 text-brand group-hover:scale-110"
+                      )}>
+                        <Folder size={20} fill="currentColor" fillOpacity={0.1} />
+                      </div>
+                      <div className="flex-1">
+                        <p className={cn(
+                          "font-bold text-sm transition-colors",
+                          selectedNaipeId === naipe.id ? "text-brand" : "text-slate-700"
+                        )}>
+                          {naipe.nome.toUpperCase()}
+                        </p>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Naipe</p>
+                      </div>
+                      {selectedNaipeId === naipe.id && (
+                        <div className="bg-brand text-white rounded-full p-1 shadow-sm">
+                          <CheckCircle2 size={12} strokeWidth={4} />
+                        </div>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="py-12 text-center space-y-3">
+                    <Folder className="mx-auto text-slate-200" size={32} />
+                    <p className="text-xs font-bold text-slate-400">Nenhum naipe configurado.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Botão de Ação */}
+            <button
+               onClick={handleAssign}
+               disabled={!selectedGrade || selectedPages.length === 0 || !selectedNaipeId || isAssigning}
+               className={cn(
+                 "w-full font-black py-4 md:py-6 rounded-[32px] text-xs uppercase tracking-[0.2em] transition-all border-2 flex flex-col items-center justify-center gap-2",
+                 !selectedGrade || selectedPages.length === 0 || !selectedNaipeId || isAssigning
+                   ? "bg-slate-50 text-slate-300 border-dashed border-slate-200 cursor-not-allowed"
+                   : "bg-brand text-white border-brand shadow-lg shadow-brand/20 hover:scale-102 active:scale-98"
+               )}
+            >
+              <div className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-colors",
+                !selectedGrade || selectedPages.length === 0 || !selectedNaipeId || isAssigning
+                  ? "bg-white text-slate-200"
+                  : "bg-white/20 text-white"
+              )}>
+                {isAssigning ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={18} />
+                )}
+              </div>
+              <span>{isAssigning ? "Processando..." : "Atribuir"}</span>
+            </button>
+          </motion.div>
+        </div>
       </div>
-
-      {/* PDF Manipulation Section */}
-      {selectedGrade && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-6"
-        >
-          {loadingPdf ? (
-            <div className="bg-slate-50 py-20 rounded-[32px] border border-slate-200 flex flex-col items-center justify-center gap-4">
-               <Loader2 size={32} className="animate-spin text-brand/20" />
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Carregando PDF...</p>
-            </div>
-          ) : pdfDoc ? (
-            <div className="space-y-6">
-               {/* Thumbnail Navigation */}
-               <div className="bg-white p-4 rounded-[28px] border border-slate-200 shadow-sm relative">
-                  <div className="flex items-center justify-between mb-4 px-2">
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Páginas da Grade</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-400">{selectedPageNumber} de {pdfDoc.numPages}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                     <div className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-2 px-1">
-                        {Array.from({ length: pdfDoc.numPages }).map((_, i) => (
-                          <PDFThumbnail 
-                            key={i + 1}
-                            pageNumber={i + 1}
-                            pdf={pdfDoc}
-                            isSelected={selectedPageNumber === (i + 1)}
-                            onSelect={setSelectedPageNumber}
-                          />
-                        ))}
-                     </div>
-                  </div>
-               </div>
-
-               {/* Large Preview */}
-               <div className="space-y-4">
-                  <div className="flex items-center justify-between px-2">
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Visualização da Página</h3>
-                    <div className="bg-brand/5 border border-brand/10 px-3 py-1 rounded-full">
-                       <p className="text-[9px] font-black text-brand uppercase tracking-widest">Página {selectedPageNumber}</p>
-                    </div>
-                  </div>
-                  <PDFPageRenderer 
-                    pdf={pdfDoc} 
-                    pageNumber={selectedPageNumber} 
-                  />
-               </div>
-            </div>
-          ) : (
-            <div className="bg-red-50 p-8 rounded-[32px] border border-red-100 text-center">
-              <p className="text-sm font-bold text-red-500">Erro ao carregar pré-visualização do PDF.</p>
-            </div>
-          )}
-        </motion.div>
-      )}
 
       {/* Modal - Nova Grade */}
       <AnimatePresence>

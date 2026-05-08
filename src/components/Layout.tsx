@@ -54,6 +54,12 @@ export function Navbar() {
       icon: Settings,
       submenu: [
         { 
+          label: 'Gerenciamento de Grades', 
+          path: '/gerenciamento-grades', 
+          icon: LayoutDashboard,
+          visible: canSeeGrades
+        },
+        { 
           label: 'Distribuidor de Grades', 
           path: '/servicos/grades', 
           icon: FileStack,
@@ -67,7 +73,16 @@ export function Navbar() {
         }
       ].filter(sub => sub.visible !== false)
     },
-    { label: 'Integrantes', path: '/membros', icon: User, visible: isDocOrAdmin },
+    { 
+      label: 'Integrantes', 
+      path: '#', 
+      icon: User, 
+      visible: isDocOrAdmin,
+      submenu: [
+        { label: 'Naipes', path: '/gerenciamento-naipes', icon: FileStack },
+        { label: 'Músicos', path: '/gerenciamento-musicos', icon: User },
+      ]
+    },
     { label: 'Meu Perfil', path: '/perfil', icon: User },
   ].filter(item => (!item.submenu || item.submenu.length > 0) && item.visible !== false);
 

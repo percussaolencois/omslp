@@ -14,7 +14,8 @@ import { Distribution } from './pages/Distribution';
 import { ScoreDistribution } from './pages/ScoreDistribution';
 import { GradesManagement } from './pages/GradesManagement';
 import { MusicRequest } from './pages/MusicRequest';
-import { Members } from './pages/Members';
+import { NaipeManagement } from './pages/NaipeManagement';
+import { UserManagement } from './pages/UserManagement';
 import { Profile } from './pages/Profile';
 import { Register } from './pages/Register';
 
@@ -46,7 +47,8 @@ export default function App() {
           <Route path="/servicos/distribuicao" element={<PrivateRoute><Distribution /></PrivateRoute>} />
           <Route path="/servicos/grades" element={<PrivateRoute><ScoreDistribution /></PrivateRoute>} />
           <Route path="/gerenciamento-grades" element={<PrivateRoute><GradesManagement /></PrivateRoute>} />
-          <Route path="/membros" element={<PrivateRoute><Members /></PrivateRoute>} />
+          <Route path="/gerenciamento-naipes" element={<PrivateRoute><NaipeManagement /></PrivateRoute>} />
+          <Route path="/gerenciamento-musicos" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
           <Route path="/perfil" element={<PrivateRoute><Profile /></PrivateRoute>} />
           
           <Route path="*" element={<Navigate to="/" />} />
