@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Orchestra member profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "Nome": { "type": "string" },
+        "email": { "type": "string" },
+        "fotoUrl": { "type": "string" },
+        "tipoAcesso": { "type": "string", "enum": ["Músico", "Chefe de Naipe", "Maestro", "Diretoria", "Administrativo"] },
+        "naipe": { "type": "string" },
+        "ativo": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "tipoAcesso", "ativo"]
+    },
+    "SheetMusic": {
+      "title": "Sheet Music",
+      "description": "Digital sheet music file metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "composer": { "type": "string" },
+        "arrangement": { "type": "string" },
+        "category": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "fileUrl"]
+    },
+    "Distribution": {
+      "title": "Distribution",
+      "description": "Sheet music distributed to specific instruments or musicians",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "musicId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["all", "instrument", "individual"] },
+        "targetValue": { "type": "string" },
+        "distributedBy": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["musicId", "targetType"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Stored user profiles"
+    },
+    "sheet_music": {
+      "schema": "SheetMusic",
+      "description": "Library of sheet music"
+    },
+    "distributions": {
+      "schema": "Distribution",
+      "description": "Log of music distributions"
+    }
+  }
+}

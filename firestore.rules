@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAtivo() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.ativo == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tipoAcesso in ['Diretoria', 'Administrativo'] ||
+        request.auth.token.email == 'percussaolencois@gmail.com'
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'tipoAcesso', 'ativo']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.tipoAcesso in ['Músico', 'Chefe de Naipe', 'Maestro', 'Diretoria', 'Administrativo'] &&
+             data.ativo is bool;
+    }
+
+    function isValidSheetMusic(data) {
+      return data.keys().hasAll(['title', 'fileUrl']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.fileUrl is string && data.fileUrl.size() <= 1000;
+    }
+
+    function isValidDistribution(data) {
+      return data.keys().hasAll(['musicId', 'targetType']) &&
+             data.musicId is string &&
+             data.targetType in ['all', 'instrument', 'individual'];
+    }
+
+    // --- Rules ---
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.ativo == true;
+      allow update: if (isAtivo() && isOwner(userId) && isValidUser(request.resource.data) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Nome', 'fotoUrl', 'naipe', 'updatedAt', 'tipoAcesso', 'ativo']) &&
+                      (request.resource.data.tipoAcesso == resource.data.tipoAcesso || isAdmin()) &&
+                      (request.resource.data.ativo == resource.data.ativo || isAdmin())) ||
+                      isAdmin();
+    }
+
+    // Sheet Music Collection
+    match /sheet_music/{musicId} {
+      allow read: if isAtivo();
+      allow create, update, delete: if isAdmin() && isValidSheetMusic(request.resource.data);
+    }
+
+    // Distributions Collection
+    match /distributions/{distId} {
+      allow read: if isAtivo();
+      allow create, update, delete: if isAdmin() && isValidDistribution(request.resource.data);
+    }
+  }
+}
