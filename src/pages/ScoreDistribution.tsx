@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileStack, Upload, Plus, X, Search, FileText, Loader2, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileStack, Upload, Plus, X, Search, FileText, Loader2, CheckCircle2 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import * as pdfjs from 'pdfjs-dist';
 
-// Usar o worker local do pacote instalado
+// @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -21,7 +21,14 @@ interface Grade {
   createdAt: string;
 }
 
-const PDFThumbnail = ({ pageNumber, pdf, onSelect, isSelected }: { pageNumber: number, pdf: pdfjs.PDFDocumentProxy, onSelect: (n: number) => void, isSelected: boolean }) => {
+interface PDFThumbnailProps {
+  pageNumber: number;
+  pdf: pdfjs.PDFDocumentProxy;
+  onSelect: (n: number) => void;
+  isSelected: boolean;
+}
+
+const PDFThumbnail: React.FC<PDFThumbnailProps> = ({ pageNumber, pdf, onSelect, isSelected }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -41,7 +48,7 @@ const PDFThumbnail = ({ pageNumber, pdf, onSelect, isSelected }: { pageNumber: n
         await page.render({
           canvasContext: context,
           viewport: viewport
-        }).promise;
+        } as any).promise;
       } catch (error) {
         console.error("Error rendering thumbnail:", error);
       }
@@ -54,22 +61,27 @@ const PDFThumbnail = ({ pageNumber, pdf, onSelect, isSelected }: { pageNumber: n
     <div 
       onClick={() => onSelect(pageNumber)}
       className={cn(
-        "flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border-2 transition-all p-1 w-24 md:w-28 bg-white shadow-sm",
+        "flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border-2 transition-all p-1 w-16 md:w-20 bg-white shadow-sm",
         isSelected ? "border-brand ring-4 ring-brand/5 scale-105 z-10" : "border-transparent hover:border-slate-200 hover:scale-102"
       )}
     >
       <canvas ref={canvasRef} className="rounded-lg w-full h-auto" />
       <p className={cn(
-        "text-[8px] font-black text-center mt-1.5 uppercase tracking-tighter",
+        "text-[7px] font-black text-center mt-1 uppercase tracking-tighter",
         isSelected ? "text-brand" : "text-slate-400"
       )}>
-        Página {pageNumber}
+        Pág {pageNumber}
       </p>
     </div>
   );
 };
 
-const PDFPageRenderer = ({ pageNumber, pdf }: { pageNumber: number, pdf: pdfjs.PDFDocumentProxy }) => {
+interface PDFPageRendererProps {
+  pageNumber: number;
+  pdf: pdfjs.PDFDocumentProxy;
+}
+
+const PDFPageRenderer: React.FC<PDFPageRendererProps> = ({ pageNumber, pdf }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
@@ -108,7 +120,7 @@ const PDFPageRenderer = ({ pageNumber, pdf }: { pageNumber: number, pdf: pdfjs.P
           canvasContext: context,
           viewport: viewport,
           transform: transform as any
-        }).promise;
+        } as any).promise;
       } catch (error) {
         console.error("Error rendering page:", error);
       } finally {
@@ -185,19 +197,23 @@ export function ScoreDistribution() {
     setLoadingPdf(true);
     setPdfDoc(null);
     try {
-      // Tentar buscar o arquivo primeiro para verificar CORS
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Erro ao buscar PDF: ${response.statusText}`);
+      // Usamos diretamente o getDocument. Se falhar por CORS, o erro será capturado.
+      const loadingTask = pdfjs.getDocument({
+        url,
+        withCredentials: false // Evita problemas com cookies em cross-origin
+      });
       
-      const data = await response.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(data) });
       const pdf = await loadingTask.promise;
       setPdfDoc(pdf);
       setSelectedPageNumber(1);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao carregar PDF:", error);
-      if (error instanceof Error && error.message.includes('CORS')) {
-        alert("Erro de acesso (CORS). Por favor, siga as instruções no console do Firebase para permitir o acesso ao storage.");
+      
+      // Se for erro de CORS ou falha de rede
+      if (error.name === 'UnknownErrorException' || error.message?.includes('fetch')) {
+        alert("⚠️ Erro de Permissão (CORS):\n\nO Firebase Storage bloqueou o acesso ao PDF. \n\nPara resolver, você precisa configurar o CORS no Console do Firebase usando o comando 'gsutil cors set'.");
+      } else {
+        alert("Erro ao carregar o PDF. Verifique se o arquivo ainda existe.");
       }
     } finally {
       setLoadingPdf(false);
@@ -270,7 +286,7 @@ export function ScoreDistribution() {
       </header>
 
       {/* Main Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 items-start">
+      <div className="max-w-2xl mx-auto w-full transition-all">
         {/* Selection Area */}
         <div className="bg-white p-5 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4 md:space-y-6">
           <div className="space-y-2">
@@ -362,19 +378,6 @@ export function ScoreDistribution() {
             </motion.div>
           )}
         </div>
-
-        {/* Second Area - Instructions or Actions */}
-        <div className="space-y-4 md:space-y-6">
-          <div className="bg-slate-50 p-6 md:p-8 rounded-3xl border border-dashed border-slate-300 text-center space-y-3 md:space-y-4">
-            <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm text-slate-300">
-              <FileStack size={24} className="md:w-8 md:h-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-bold text-slate-700 text-sm md:text-base">Manipulação de Páginas</h3>
-              <p className="text-[10px] md:text-xs text-slate-500 max-w-[200px] md:max-w-xs mx-auto">Selecione uma partitura para visualizar e distribuir as páginas para os instrumentos.</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* PDF Manipulation Section */}
@@ -401,15 +404,7 @@ export function ScoreDistribution() {
                   </div>
                   
                   <div className="flex items-center gap-3">
-                     <button 
-                       onClick={() => setSelectedPageNumber(prev => Math.max(1, prev - 1))}
-                       disabled={selectedPageNumber === 1}
-                       className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 disabled:opacity-30 shrink-0"
-                     >
-                       <ChevronLeft size={20} />
-                     </button>
-
-                     <div className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-2">
+                     <div className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-2 px-1">
                         {Array.from({ length: pdfDoc.numPages }).map((_, i) => (
                           <PDFThumbnail 
                             key={i + 1}
@@ -420,14 +415,6 @@ export function ScoreDistribution() {
                           />
                         ))}
                      </div>
-
-                     <button 
-                       onClick={() => setSelectedPageNumber(prev => Math.min(pdfDoc.numPages, prev + 1))}
-                       disabled={selectedPageNumber === pdfDoc.numPages}
-                       className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 disabled:opacity-30 shrink-0"
-                     >
-                       <ChevronRight size={20} />
-                     </button>
                   </div>
                </div>
 
