@@ -12,6 +12,7 @@ import { Login } from './pages/Login';
 import { MyMusic } from './pages/MyMusic';
 import { Distribution } from './pages/Distribution';
 import { ScoreDistribution } from './pages/ScoreDistribution';
+import { PartituraManagement } from './pages/PartituraManagement';
 import { GradesManagement } from './pages/GradesManagement';
 import { MusicRequest } from './pages/MusicRequest';
 import { NaipeManagement } from './pages/NaipeManagement';
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/solicitacao-partitura" element={<PrivateRoute><MusicRequest /></PrivateRoute>} />
           <Route path="/servicos/distribuicao" element={<PrivateRoute><Distribution /></PrivateRoute>} />
           <Route path="/servicos/grades" element={<PrivateRoute><ScoreDistribution /></PrivateRoute>} />
+          <Route path="/servicos/partituras" element={<PrivateRoute><PartituraManagement /></PrivateRoute>} />
           <Route path="/gerenciamento-grades" element={<PrivateRoute><GradesManagement /></PrivateRoute>} />
           <Route path="/gerenciamento-naipes" element={<PrivateRoute><NaipeManagement /></PrivateRoute>} />
           <Route path="/gerenciamento-musicos" element={<PrivateRoute><UserManagement /></PrivateRoute>} />

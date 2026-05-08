@@ -21,21 +21,17 @@ import { motion, AnimatePresence } from 'motion/react';
 const LOGO_URL = "https://res.cloudinary.com/djuo9edyf/image/upload/v1768831128/logoOrqTransparente_gz39is.png";
 
 export function Navbar() {
-  const { profile, logout, isAdmin: isGlobalAdmin } = useAuth();
+  const { profile, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const location = useLocation();
 
   const userRole = profile?.tipoAcesso;
   
-  // Regras de acesso: 
-  // Distribuidor de grades: Administrativo, Diretoria ou Maestro
-  const canSeeGrades = userRole === 'Administrativo' || userRole === 'Diretoria' || userRole === 'Maestro' || isGlobalAdmin;
-  
-  // Distribuidor de partituras: Chefe de Naipe ou Diretoria APENAS
+  // Regras de acesso baseadas APENAS no tipoAcesso
+  const canSeeGrades = userRole === 'Administrativo' || userRole === 'Diretoria' || userRole === 'Maestro';
   const canSeePartsDist = userRole === 'Chefe de Naipe' || userRole === 'Diretoria';
-
-  const isDocOrAdmin = userRole === 'Administrativo' || userRole === 'Diretoria' || isGlobalAdmin;
+  const isDocOrAdmin = userRole === 'Administrativo' || userRole === 'Diretoria';
 
   const navItems = [
     { label: 'Home', path: '/', icon: Home },
@@ -66,9 +62,9 @@ export function Navbar() {
           visible: canSeeGrades
         },
         { 
-          label: 'Distribuidor de Partituras', 
-          path: '/servicos/distribuicao', 
-          icon: Send,
+          label: 'Gerenciador de Partituras', 
+          path: '/servicos/partituras', 
+          icon: FileStack,
           visible: canSeePartsDist
         }
       ].filter(sub => sub.visible !== false)
@@ -79,9 +75,14 @@ export function Navbar() {
       icon: User, 
       visible: isDocOrAdmin,
       submenu: [
-        { label: 'Naipes', path: '/gerenciamento-naipes', icon: FileStack },
+        { 
+          label: 'Naipes', 
+          path: '/gerenciamento-naipes', 
+          icon: FileStack,
+          visible: isDocOrAdmin 
+        },
         { label: 'Músicos', path: '/gerenciamento-musicos', icon: User },
-      ]
+      ].filter(sub => sub.visible !== false)
     },
     { label: 'Meu Perfil', path: '/perfil', icon: User },
   ].filter(item => (!item.submenu || item.submenu.length > 0) && item.visible !== false);
