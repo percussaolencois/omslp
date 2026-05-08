@@ -49,6 +49,20 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["musicId", "targetType"]
+    },
+    "Grade": {
+      "title": "Grade",
+      "description": "Digital full score (Grade) PDF",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "titulo": { "type": "string" },
+        "repertorio": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["titulo", "pdfUrl", "repertorio"]
     }
   },
   "firestore": {
@@ -63,6 +77,10 @@
     "distributions": {
       "schema": "Distribution",
       "description": "Log of music distributions"
+    },
+    "grades": {
+      "schema": "Grade",
+      "description": "Stored musical scores (Grades)"
     }
   }
 }

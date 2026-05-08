@@ -27,6 +27,13 @@ service cloud.firestore {
       );
     }
 
+    function canManageGrades() {
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tipoAcesso in ['Diretoria', 'Administrativo', 'Maestro'] ||
+        request.auth.token.email == 'percussaolencois@gmail.com'
+      );
+    }
+
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -53,6 +60,13 @@ service cloud.firestore {
              data.targetType in ['all', 'instrument', 'individual'];
     }
 
+    function isValidGrade(data) {
+      return data.keys().hasAll(['titulo', 'pdfUrl', 'repertorio']) &&
+             data.titulo is string && data.titulo.size() > 0 && data.titulo.size() <= 200 &&
+             data.repertorio is string && data.repertorio.size() <= 100 &&
+             data.pdfUrl is string && data.pdfUrl.size() <= 1000;
+    }
+
     // --- Rules ---
 
     // Users Collection
@@ -77,6 +91,12 @@ service cloud.firestore {
     match /distributions/{distId} {
       allow read: if isAtivo();
       allow create, update, delete: if isAdmin() && isValidDistribution(request.resource.data);
+    }
+
+    // Grades Collection
+    match /grades/{gradeId} {
+      allow read: if isAtivo();
+      allow create, update, delete: if canManageGrades() && isValidGrade(request.resource.data);
     }
   }
 }
