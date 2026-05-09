@@ -24,6 +24,7 @@ interface Grade {
 interface Naipe {
   id: string;
   nome: string;
+  icone?: string;
 }
 
 interface PDFThumbnailProps {
@@ -214,7 +215,8 @@ export function ScoreDistribution() {
       const querySnapshot = await getDocs(collection(db, 'config', 'naipes', 'lista'));
       const naipesList = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        nome: doc.data().naipe || doc.id
+        nome: doc.data().naipe || doc.id,
+        icone: doc.data().icone
       })) as Naipe[];
       
       setNaipes(naipesList);
@@ -527,12 +529,16 @@ export function ScoreDistribution() {
                       )}
                     >
                       <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                        "w-10 h-10 rounded-xl flex items-center justify-center transition-all overflow-hidden",
                         selectedNaipeId === naipe.id
                           ? "bg-brand text-white scale-110"
                           : "bg-brand/5 text-brand group-hover:scale-110"
                       )}>
-                        <Folder size={20} fill="currentColor" fillOpacity={0.1} />
+                        {naipe.icone ? (
+                          <img src={naipe.icone} alt={naipe.nome} className="w-full h-full object-cover" />
+                        ) : (
+                          <Folder size={20} fill="currentColor" fillOpacity={0.1} />
+                        )}
                       </div>
                       <div className="flex-1">
                         <p className={cn(

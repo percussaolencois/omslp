@@ -91,6 +91,7 @@ interface MusicNotebookProps {
   availablePartituras: Partitura[];
   onClose: () => void;
   title: string;
+  notebookId?: string;
 }
 
 interface SortableNavCardProps {
@@ -146,7 +147,7 @@ const SortableNavCard: React.FC<SortableNavCardProps> = ({ id, page, index, onRe
   );
 };
 
-export function MusicNotebook({ initialPages, availablePartituras, onClose, title }: MusicNotebookProps) {
+export function MusicNotebook({ initialPages, availablePartituras, onClose, title, notebookId }: MusicNotebookProps) {
   const [pages, setPages] = useState<NotebookPage[]>(initialPages);
   const [annotations, setAnnotations] = useState<PageAnnotation>({});
   const [tool, setTool] = useState<'pencil' | 'highlighter' | 'eraser' | 'none'>('none');
@@ -221,7 +222,8 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
     }
 
     setIsSaving(true);
-    const saveId = `${auth.currentUser.uid}_${title.replace(/\s+/g, '_')}`;
+    const baseId = notebookId || title.replace(/\s+/g, '_');
+    const saveId = `${auth.currentUser.uid}_${baseId}`;
     const path = `notebook_saves/${saveId}`;
 
     try {
@@ -246,21 +248,22 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
     const loadFromCloud = async () => {
       if (!auth.currentUser) return;
 
-      const saveId = `${auth.currentUser.uid}_${title.replace(/\s+/g, '_')}`;
+      const baseId = notebookId || title.replace(/\s+/g, '_');
+      const saveId = `${auth.currentUser.uid}_${baseId}`;
       const path = `notebook_saves/${saveId}`;
 
       try {
         const docSnap = await getDoc(doc(db, 'notebook_saves', saveId));
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data.pages) setPages(data.pages);
+          // Do not overwrite pages, respect the initialPages requested by the user
+          // But we can restore the annotations for those pages
           if (data.annotations) setAnnotations(data.annotations);
         } else {
           // Fallback to local storage if no cloud save exists yet
-          const saved = localStorage.getItem(`notebook_save_${title}`);
+          const saved = localStorage.getItem(`notebook_save_${baseId}`);
           if (saved) {
              const parsed = JSON.parse(saved);
-             if (parsed.pages) setPages(parsed.pages);
              if (parsed.annotations) setAnnotations(parsed.annotations);
           }
         }
@@ -303,7 +306,8 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
     const newPages: NotebookPage[] = part.pagSelecionadas.map((pageNum, idx) => ({
       id: `${part.id}-${Date.now()}-p${pageNum}-${idx}`,
       pdfUrl: part.pdfUrl!,
-      originalPageNumber: pageNum
+      originalPageNumber: pageNum,
+      annotationKey: `${part.id}-p${pageNum}`
     }));
 
     setPages(prev => [...prev, ...newPages]);
@@ -566,24 +570,27 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
         {/* PAGE CONTENT - TRUE FULL WIDTH */}
         <div className="flex flex-col items-center w-full min-h-full">
             <div className="w-full">
-              {pages.map((page, index) => (
-                  <Document key={page.id} file={page.pdfUrl}>
-                      <ScorePage 
-                          id={page.id}
-                          pdfUrl={page.pdfUrl}
-                          pageNumber={page.originalPageNumber}
-                          index={index}
-                          annotations={annotations[page.id] || []}
-                          onAddAnnotation={(stroke) => addAnnotation(page.id, stroke)}
-                          onRemoveAnnotation={(strokeId) => removeAnnotation(page.id, strokeId)}
-                          tool={tool}
-                          activeColor={activeColor}
-                          activeWidth={activeWidth}
-                          scale={scale}
-                          containerWidth={containerWidth}
-                      />
-                  </Document>
-              ))}
+              {pages.map((page, index) => {
+                  const annKey = page.annotationKey || page.id;
+                  return (
+                    <Document key={page.id} file={page.pdfUrl}>
+                        <ScorePage 
+                            id={page.id}
+                            pdfUrl={page.pdfUrl}
+                            pageNumber={page.originalPageNumber}
+                            index={index}
+                            annotations={annotations[annKey] || []}
+                            onAddAnnotation={(stroke) => addAnnotation(annKey, stroke)}
+                            onRemoveAnnotation={(strokeId) => removeAnnotation(annKey, strokeId)}
+                            tool={tool}
+                            activeColor={activeColor}
+                            activeWidth={activeWidth}
+                            scale={scale}
+                            containerWidth={containerWidth}
+                        />
+                    </Document>
+                  );
+              })}
             </div>
         </div>
 

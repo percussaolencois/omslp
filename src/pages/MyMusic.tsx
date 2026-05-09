@@ -18,7 +18,7 @@ export function MyMusic() {
   const [partituras, setPartituras] = useState<Partitura[]>([]);
   const [loadingPartituras, setLoadingPartituras] = useState(false);
 
-  const [activeNotebook, setActiveNotebook] = useState<{ pages: NotebookPage[], title: string } | null>(null);
+  const [activeNotebook, setActiveNotebook] = useState<{ pages: NotebookPage[], title: string, id: string } | null>(null);
 
   useEffect(() => {
     let unsubscribe: () => void;
@@ -112,15 +112,17 @@ export function MyMusic() {
       return;
     }
 
-    const notebookPages: NotebookPage[] = part.pagSelecionadas.map((pageNum, idx) => ({
+    const notebookPages: NotebookPage[] = part.pagSelecionadas.map((pageNum: number, idx: number) => ({
        id: `${part.id}-p${pageNum}-${idx}`,
        pdfUrl: part.pdfUrl!,
-       originalPageNumber: pageNum
+       originalPageNumber: pageNum,
+       annotationKey: `${part.id}-p${pageNum}`
     }));
 
     setActiveNotebook({
       pages: notebookPages,
-      title: part.titulo || 'Partitura'
+      title: part.titulo || 'Partitura',
+      id: part.id
     });
   };
 
@@ -130,6 +132,7 @@ export function MyMusic() {
         initialPages={activeNotebook.pages}
         availablePartituras={partituras.filter(p => !activeNotebook.pages.some(ap => ap.pdfUrl === p.pdfUrl && p.pagSelecionadas?.includes(ap.originalPageNumber)))}
         title={activeNotebook.title}
+        notebookId={activeNotebook.id}
         onClose={() => setActiveNotebook(null)}
       />
     );

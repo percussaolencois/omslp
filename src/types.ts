@@ -9,6 +9,7 @@ export interface NotebookPage {
   id: string;
   pdfUrl: string;
   originalPageNumber: number;
+  annotationKey?: string;
 }
 
 export interface Point {

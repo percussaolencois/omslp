@@ -11,6 +11,7 @@ interface Naipe {
   naipe: string;
   repertorios?: string[];
   integrantes?: string[];
+  icone?: string;
 }
 
 export function NaipeManagement() {
@@ -22,6 +23,8 @@ export function NaipeManagement() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newIcone, setNewIcone] = useState('');
+  const [editIcone, setEditIcone] = useState('');
   const [isSavingNew, setIsSavingNew] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -109,9 +112,10 @@ export function NaipeManagement() {
     try {
       await updateDoc(doc(db, 'config', 'naipes', 'lista', id), {
         naipe: editName,
+        icone: editIcone,
         updatedAt: new Date().toISOString()
       });
-      setNaipes(prev => prev.map(n => n.id === id ? { ...n, naipe: editName } : n));
+      setNaipes(prev => prev.map(n => n.id === id ? { ...n, naipe: editName, icone: editIcone } : n));
       setEditingId(null);
     } catch (error) {
       console.error("Erro ao atualizar:", error);
@@ -124,6 +128,7 @@ export function NaipeManagement() {
     try {
       const docRef = await addDoc(collection(db, 'config', 'naipes', 'lista'), {
         naipe: newName,
+        icone: newIcone,
         repertorios: [],
         integrantes: [],
         createdAt: new Date().toISOString()
@@ -132,12 +137,14 @@ export function NaipeManagement() {
       const newNaipe: Naipe = {
         id: docRef.id,
         naipe: newName,
+        icone: newIcone,
         repertorios: [],
         integrantes: []
       };
       
       setNaipes(prev => [...prev, newNaipe].sort((a, b) => a.naipe.localeCompare(b.naipe)));
       setNewName('');
+      setNewIcone('');
       setIsAdding(false);
     } catch (error) {
       console.error("Erro ao criar naipe:", error);
@@ -198,6 +205,16 @@ export function NaipeManagement() {
                   className="w-full bg-white border border-brand/20 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-brand/10 transition-all"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-brand uppercase tracking-widest ml-1">URL do Ícone (Opcional)</label>
+                <input 
+                  type="url"
+                  placeholder="https://..."
+                  className="w-full bg-white border border-brand/20 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-brand/10 transition-all"
+                  value={newIcone}
+                  onChange={(e) => setNewIcone(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                 />
               </div>
@@ -210,7 +227,7 @@ export function NaipeManagement() {
                   {isSavingNew ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Salvar
                 </button>
                 <button 
-                  onClick={() => { setIsAdding(false); setNewName(''); }}
+                  onClick={() => { setIsAdding(false); setNewName(''); setNewIcone(''); }}
                   className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
                 >
                   <X size={14} /> Cancelar
@@ -247,6 +264,16 @@ export function NaipeManagement() {
                       onChange={(e) => setEditName(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Editar URL do Ícone</label>
+                    <input 
+                      type="url"
+                      placeholder="https://..."
+                      className="w-full bg-slate-50 border border-brand/20 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-brand/10 transition-all"
+                      value={editIcone}
+                      onChange={(e) => setEditIcone(e.target.value)}
+                    />
+                  </div>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => handleUpdate(naipe.id)}
@@ -265,8 +292,12 @@ export function NaipeManagement() {
               ) : (
                 <>
                   <div className="flex items-center gap-4 overflow-hidden flex-1 mr-4">
-                    <div className="w-10 h-10 bg-brand/5 text-brand rounded-lg flex items-center justify-center shrink-0">
-                      <Folder size={20} />
+                    <div className="w-10 h-10 bg-brand/5 text-brand rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                      {naipe.icone ? (
+                        <img src={naipe.icone} alt={naipe.naipe} className="w-full h-full object-cover" />
+                      ) : (
+                        <Folder size={20} />
+                      )}
                     </div>
                       <div className="min-w-0" onClick={() => fetchNaipeDetails(naipe)}>
                          <h3 className="font-bold text-slate-700 text-sm truncate uppercase tracking-tight cursor-pointer hover:text-brand">{naipe.naipe}</h3>
@@ -279,6 +310,7 @@ export function NaipeManagement() {
                       onClick={() => {
                         setEditingId(naipe.id);
                         setEditName(naipe.naipe);
+                        setEditIcone(naipe.icone || '');
                       }}
                       className="p-2.5 hover:bg-blue-50 text-blue-400 hover:text-blue-600 rounded-xl transition-colors"
                     >

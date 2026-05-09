@@ -298,12 +298,15 @@ export function PartituraManagement() {
       
       const batch = writeBatch(db);
       const integranteRef = doc(db, 'config', 'naipes', 'lista', naipeId, 'integrantes', selectedIntegranteId);
-      const path = doc(db, 'config', 'naipes', 'lista', naipeId, 'integrantes', selectedIntegranteId, repertorio, selectedPartituraId);
+      const repertorioCollectionRef = collection(db, 'config', 'naipes', 'lista', naipeId, 'integrantes', selectedIntegranteId, repertorio);
+      const path = doc(repertorioCollectionRef);
       
       batch.set(path, {
         titulo: titulo,
         pdfUrl: pdfUrl,
-        pagSelecionadas: selectedPages.sort((a, b) => a - b)
+        pagSelecionadas: selectedPages.sort((a, b) => a - b),
+        partituraOriginalId: selectedPartituraId,
+        createdAt: new Date().toISOString()
       });
       batch.update(integranteRef, {
         totalPartituras: increment(1),

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { collection, query, getDocs, doc, deleteDoc, updateDoc, orderBy } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
-import { FileText, Trash2, Edit2, ChevronLeft, Search, Loader2, Save, X, FileStack } from 'lucide-react';
+import { FileText, Trash2, Edit2, ChevronLeft, Search, Loader2, Save, X, FileStack, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -102,17 +102,25 @@ export function GradesManagement() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-4 md:px-0">
-      <header className="flex items-center gap-4">
-        <button 
-          onClick={() => navigate(-1)}
-          className="p-2 hover:bg-slate-100 rounded-xl text-brand transition-colors"
-        >
-          <ChevronLeft size={24} />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-brand tracking-tight">Gerenciamento de Grades</h1>
-          <p className="text-[11px] text-slate-500 font-medium uppercase tracking-widest">Biblioteca de Partituras</p>
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-slate-100 rounded-xl text-brand transition-colors"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-brand tracking-tight">Gerenciamento de Grades</h1>
+            <p className="text-[11px] text-slate-500 font-medium uppercase tracking-widest">Biblioteca de Partituras</p>
+          </div>
         </div>
+        <button
+          onClick={() => navigate('/servicos/grades')}
+          className="bg-brand text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-brand-light shadow-lg hover:shadow-brand/30 transition-all flex items-center justify-center gap-2"
+        >
+          <Plus size={16} /> Adicionar Grade
+        </button>
       </header>
 
       <div className="space-y-4">
@@ -258,7 +266,7 @@ export function GradesManagement() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-0.5 md:gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-0.5 md:gap-1 opacity-100 transition-opacity">
                           <button 
                             onClick={() => {
                               setEditingId(grade.id);
