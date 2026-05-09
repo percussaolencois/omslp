@@ -4,13 +4,8 @@ import { Music2, Search, ExternalLink, BookOpen, ArrowLeft, FileText, Download }
 import { motion } from 'motion/react';
 import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-
-interface Partitura {
-  id: string;
-  titulo?: string;
-  pdfUrl?: string;
-  pagSelecionadas?: number[];
-}
+import { MusicNotebook } from '../components/MusicNotebook';
+import { Partitura, NotebookPage } from '../types';
 
 export function MyMusic() {
   const { profile, user } = useAuth();
@@ -22,6 +17,8 @@ export function MyMusic() {
   const [selectedRepertorio, setSelectedRepertorio] = useState<string | null>(null);
   const [partituras, setPartituras] = useState<Partitura[]>([]);
   const [loadingPartituras, setLoadingPartituras] = useState(false);
+
+  const [activeNotebook, setActiveNotebook] = useState<{ pages: NotebookPage[], title: string } | null>(null);
 
   useEffect(() => {
     let unsubscribe: () => void;
@@ -109,6 +106,35 @@ export function MyMusic() {
     p.titulo?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const openPartitura = (part: Partitura) => {
+    if (!part.pdfUrl || !part.pagSelecionadas || part.pagSelecionadas.length === 0) {
+      alert('Esta partitura não possui páginas configuradas.');
+      return;
+    }
+
+    const notebookPages: NotebookPage[] = part.pagSelecionadas.map((pageNum, idx) => ({
+       id: `${part.id}-p${pageNum}-${idx}`,
+       pdfUrl: part.pdfUrl!,
+       originalPageNumber: pageNum
+    }));
+
+    setActiveNotebook({
+      pages: notebookPages,
+      title: part.titulo || 'Partitura'
+    });
+  };
+
+  if (activeNotebook) {
+    return (
+      <MusicNotebook 
+        initialPages={activeNotebook.pages}
+        availablePartituras={partituras.filter(p => !activeNotebook.pages.some(ap => ap.pdfUrl === p.pdfUrl && p.pagSelecionadas?.includes(ap.originalPageNumber)))}
+        title={activeNotebook.title}
+        onClose={() => setActiveNotebook(null)}
+      />
+    );
+  }
+
   if (selectedRepertorio) {
     return (
       <div className="space-y-8 pb-20">
@@ -150,18 +176,16 @@ export function MyMusic() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
               {filteredPartituras.map((part) => (
-              <motion.a
+              <motion.div
                   key={part.id}
-                  href={part.pdfUrl || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={() => openPartitura(part)}
                   whileHover={{ y: -2 }}
-                  className="group bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col h-full"
+                  className="group bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col h-full cursor-pointer"
               >
                   <div className="aspect-[3/4] bg-slate-100 flex items-center justify-center p-4 relative overflow-hidden group/cover border-b border-slate-200 shrink-0">
                      <FileText className="w-12 h-12 text-slate-300 transition-transform group-hover/cover:scale-110 duration-500" />
                      <div className="absolute inset-0 bg-brand/80 opacity-0 group-hover/cover:opacity-100 flex items-center justify-center transition-opacity duration-300">
-                        <button className="max-sm:hidden p-3 bg-white text-brand rounded-full hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
+                        <button className="max-sm:hidden p-3 bg-white text-brand rounded-full hover:scale-110 transition-transform" onClick={(e) => { e.stopPropagation(); openPartitura(part); }}>
                            <ExternalLink size={20} />
                         </button>
                      </div>
@@ -176,7 +200,7 @@ export function MyMusic() {
                       </span>
                     </div>
                   </div>
-              </motion.a>
+              </motion.div>
               ))}
           </div>
         )}
