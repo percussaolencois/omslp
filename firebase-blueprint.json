@@ -63,6 +63,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["titulo", "pdfUrl", "repertorio"]
+    },
+    "NotebookSave": {
+      "title": "Notebook Save",
+      "description": "Persisted notebook state including page order and annotations",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "notebookTitle": { "type": "string" },
+        "pages": { "type": "array", "items": { "type": "object" } },
+        "annotations": { "type": "object" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "notebookTitle", "pages", "annotations"]
     }
   },
   "firestore": {
@@ -81,6 +94,10 @@
     "grades": {
       "schema": "Grade",
       "description": "Stored musical scores (Grades)"
+    },
+    "notebook_saves": {
+      "schema": "NotebookSave",
+      "description": "Users' saved notebook states"
     },
     "config/naipes/lista": {
       "schema": {

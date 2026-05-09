@@ -42,9 +42,44 @@ import { ScorePage } from './ScorePage';
 import { Page } from 'react-pdf';
 import { motion, AnimatePresence } from 'motion/react';
 import { Partitura, NotebookPage, Stroke } from '../types';
+import { db, auth } from '../lib/firebase';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 // Initialize PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 interface PageAnnotation {
   [pageId: string]: Stroke[];
@@ -68,6 +103,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showOrganizer, setShowOrganizer] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -122,37 +158,70 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
     setActiveId(null);
   };
 
-  // Função para salvar o estado atual (páginas e anotações)
-  const handleSave = () => {
+  // Função para salvar o estado atual (páginas e anotações) no Nuvem (Firestore)
+  const handleSave = async () => {
+    if (!auth.currentUser) {
+      alert('Você precisa estar logado para salvar na nuvem.');
+      return;
+    }
+
+    setIsSaving(true);
+    const saveId = `${auth.currentUser.uid}_${title.replace(/\s+/g, '_')}`;
+    const path = `notebook_saves/${saveId}`;
+
     try {
-      const saveData = {
+      await setDoc(doc(db, 'notebook_saves', saveId), {
+        userId: auth.currentUser.uid,
+        notebookTitle: title,
         pages,
         annotations,
-        lastSaved: new Date().toISOString()
-      };
-      // O botão "Salvar" guarda o estado atual das suas partituras e anotações no armazenamento local do seu navegador (localStorage). 
-      // Isso significa que se você fechar o app e abrir de novo, suas anotações e a ordem das páginas estarão lá. 
-      // Em uma aplicação de produção, esse botão enviaria os dados para um banco de dados como o Firebase.
-      localStorage.setItem(`notebook_save_${title}`, JSON.stringify(saveData));
-      alert('Seu progresso foi salvo localmente!');
+        updatedAt: serverTimestamp()
+      });
+      
+      alert('Seu progresso foi salvo na nuvem e estará disponível em qualquer dispositivo!');
     } catch (e) {
-      console.error('Erro ao salvar:', e);
-      alert('Erro ao salvar anotações.');
+      handleFirestoreError(e, OperationType.WRITE, path);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Load from localStorage on mount
+  // Load from Firestore on mount
   useEffect(() => {
-    const saved = localStorage.getItem(`notebook_save_${title}`);
-    if (saved) {
+    const loadFromCloud = async () => {
+      if (!auth.currentUser) return;
+
+      const saveId = `${auth.currentUser.uid}_${title.replace(/\s+/g, '_')}`;
+      const path = `notebook_saves/${saveId}`;
+
       try {
-        const parsed = JSON.parse(saved);
-        if (parsed.pages) setPages(parsed.pages);
-        if (parsed.annotations) setAnnotations(parsed.annotations);
+        const docSnap = await getDoc(doc(db, 'notebook_saves', saveId));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.pages) setPages(data.pages);
+          if (data.annotations) setAnnotations(data.annotations);
+        } else {
+          // Fallback to local storage if no cloud save exists yet
+          const saved = localStorage.getItem(`notebook_save_${title}`);
+          if (saved) {
+             const parsed = JSON.parse(saved);
+             if (parsed.pages) setPages(parsed.pages);
+             if (parsed.annotations) setAnnotations(parsed.annotations);
+          }
+        }
       } catch (e) {
-        console.error('Erro ao carregar save:', e);
+        console.error('Erro ao carregar do Firestore:', e);
       }
-    }
+    };
+
+    // We might need to wait for auth state to initialize
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        loadFromCloud();
+      }
+    });
+
+    return () => unsubscribe();
   }, [title]);
 
   const addAnnotation = (pageId: string, stroke: Stroke) => {
@@ -414,11 +483,12 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
 
                 {/* 4: Salvar */}
                 <button 
-                  className="p-3 bg-brand text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-brand/20 shadow-brand/40"
+                  disabled={isSaving}
+                  className={`p-3 text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-brand/20 shadow-brand/40 ${isSaving ? 'bg-brand/50 cursor-wait' : 'bg-brand'}`}
                   onClick={handleSave}
                   title="Salvar"
                 >
-                  <Save size={20} />
+                  <Save size={20} className={isSaving ? 'animate-pulse' : ''} />
                 </button>
              </div>
         </div>

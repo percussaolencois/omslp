@@ -67,6 +67,13 @@ service cloud.firestore {
              data.pdfUrl is string && data.pdfUrl.size() <= 1000;
     }
 
+    function isValidNotebookSave(data) {
+      return data.keys().hasAll(['userId', 'notebookTitle', 'pages', 'annotations']) &&
+             data.userId == request.auth.uid &&
+             data.notebookTitle is string && data.notebookTitle.size() <= 200 &&
+             data.pages is list && data.pages.size() <= 200;
+    }
+
     // --- Rules ---
 
     // Users Collection
@@ -97,6 +104,15 @@ service cloud.firestore {
     match /grades/{gradeId} {
       allow read: if isAtivo();
       allow create, update, delete: if canManageGrades() && isValidGrade(request.resource.data);
+    }
+
+    // Notebook Saves Collection
+    match /notebook_saves/{saveId} {
+      allow get: if isAtivo() && resource.data.userId == request.auth.uid;
+      allow list: if isAtivo() && resource.data.userId == request.auth.uid;
+      allow create: if isAtivo() && isValidNotebookSave(request.resource.data);
+      allow update: if isAtivo() && resource.data.userId == request.auth.uid && isValidNotebookSave(request.resource.data);
+      allow delete: if isAtivo() && resource.data.userId == request.auth.uid;
     }
   }
 }
