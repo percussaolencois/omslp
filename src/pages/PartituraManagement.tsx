@@ -6,7 +6,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import * as pdfjs from 'pdfjs-dist';
-import { PDFDocument } from 'pdf-lib';
 
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -16,7 +15,9 @@ interface Partitura {
   id: string;
   titulo: string;
   repertorio: string;
-  partituras: string; // Base64
+  pdfUrl?: string; // New field
+  partituras?: string; // Base64 (legacy)
+  pagSelecionadas?: number[]; // New field
   assignedAt: string;
 }
 
@@ -168,6 +169,8 @@ export function PartituraManagement() {
   const [atribuindo, setAtribuindo] = useState(false);
   const [selectedIntegranteId, setSelectedIntegranteId] = useState<string | null>(null);
 
+  const selectedPartitura = partituras.find(p => p.id === selectedPartituraId);
+
   // PDF Viewer State
   const [pdfDoc, setPdfDoc] = useState<pdfjs.PDFDocumentProxy | null>(null);
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
@@ -243,20 +246,30 @@ export function PartituraManagement() {
     }
   };
 
-  const loadPdf = async (base64: string) => {
+  const loadPdf = async (partitura: Partitura) => {
     setLoadingPdf(true);
     setPdfDoc(null);
-    setSelectedPages([]);
-    setCurrentViewPage(1);
+    setSelectedPages(partitura.pagSelecionadas || []);
+    setCurrentViewPage(partitura.pagSelecionadas?.[0] || 1);
     try {
-      const base64Data = base64.includes('base64,') ? base64.split('base64,')[1] : base64;
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      const url = partitura.pdfUrl || partitura.partituras; // fallback
+      if (!url) throw new Error("PDF URL não encontrado");
+
+      let data;
+      if (partitura.pdfUrl) {
+          const response = await fetch(url);
+          data = await response.arrayBuffer();
+      } else {
+          const base64Data = url.includes('base64,') ? url.split('base64,')[1] : url;
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+          }
+          data = bytes;
       }
       
-      const pdf = await pdfjs.getDocument({ data: bytes }).promise;
+      const pdf = await pdfjs.getDocument({ data }).promise;
       setPdfDoc(pdf);
     } catch (error: any) {
       console.error("Erro ao carregar PDF:", error);
@@ -273,22 +286,8 @@ export function PartituraManagement() {
       const selectedPartitura = partituras.find(p => p.id === selectedPartituraId);
       if (!selectedPartitura) return;
       
-      const { partituras: base64, titulo, repertorio } = selectedPartitura;
-      const base64Data = base64.includes('base64,') ? base64.split('base64,')[1] : base64;
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      
-      const pdf = await PDFDocument.load(bytes);
-      const newPdf = await PDFDocument.create();
-      
-      const copiedPages = await newPdf.copyPages(pdf, selectedPages.map(p => p - 1));
-      copiedPages.forEach(p => newPdf.addPage(p));
-      
-      const pdfBytes = await newPdf.save();
-      const newBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+      const { pdfUrl, titulo, repertorio } = selectedPartitura;
+      if (!pdfUrl) throw new Error("PDF URL não encontrado na partitura");
       
       // Salvar no Firestore
       const naipesRef = collection(db, 'config', 'naipes', 'lista');
@@ -303,7 +302,8 @@ export function PartituraManagement() {
       
       batch.set(path, {
         titulo: titulo,
-        base64: `data:application/pdf;base64,${newBase64}`
+        pdfUrl: pdfUrl,
+        pagSelecionadas: selectedPages.sort((a, b) => a - b)
       });
       batch.update(integranteRef, {
         totalPartituras: increment(1),
@@ -335,7 +335,7 @@ export function PartituraManagement() {
   useEffect(() => {
     const selected = partituras.find(p => p.id === selectedPartituraId);
     if (selected) {
-      loadPdf(selected.partituras);
+      loadPdf(selected);
     } else {
       setPdfDoc(null);
     }
@@ -406,7 +406,6 @@ export function PartituraManagement() {
                               {selectedPages.length} Selecionada{selectedPages.length > 1 ? 's' : ''}
                             </span>
                           )}
-                          <span className="text-[10px] font-bold text-slate-400">{currentViewPage} de {pdfDoc.numPages}</span>
                         </div>
                       </div>
                       
@@ -414,12 +413,12 @@ export function PartituraManagement() {
                          <div 
                             className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-2 px-1 cursor-grab active:cursor-grabbing select-none"
                          >
-                            {Array.from({ length: pdfDoc.numPages }).map((_, i) => (
+                            {(selectedPartitura?.pagSelecionadas || Array.from({ length: pdfDoc.numPages }).map((_, i) => i + 1)).map((pageNumber) => (
                               <PDFThumbnail 
-                                key={i + 1}
-                                pageNumber={i + 1}
+                                key={pageNumber}
+                                pageNumber={pageNumber}
                                 pdf={pdfDoc}
-                                isSelected={selectedPages.includes(i + 1)}
+                                isSelected={selectedPages.includes(pageNumber)}
                                 onSelect={togglePageSelection}
                               />
                             ))}

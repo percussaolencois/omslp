@@ -58,7 +58,7 @@ export function Navbar() {
           visible: canSeeGrades
         },
         { 
-          label: 'Distribuidor de Grades', 
+          label: 'Distribuidor de partituras', 
           path: '/servicos/grades', 
           icon: FileStack,
           visible: canSeeGrades

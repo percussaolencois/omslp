@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import * as pdfjs from 'pdfjs-dist';
-import { PDFDocument } from 'pdf-lib';
 
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -270,33 +269,15 @@ export function ScoreDistribution() {
 
     setIsAssigning(true);
     try {
-      // 1. Obter o PDF original em binário
-      const response = await fetch(selectedGrade.pdfUrl);
-      const originalPdfBytes = await response.arrayBuffer();
-
-      // 2. Usar pdf-lib para extrair as páginas selecionadas
-      const pdfDoc = await PDFDocument.load(originalPdfBytes);
-      const newPdfDoc = await PDFDocument.create();
-      
-      // As páginas selecionadas estão em base 1, pdf-lib usa base 0
-      const pagesToCopy = selectedPages
-        .sort((a, b) => a - b)
-        .map(p => p - 1);
-      
-      const copiedPages = await newPdfDoc.copyPages(pdfDoc, pagesToCopy);
-      copiedPages.forEach(page => newPdfDoc.addPage(page));
-
-      // 3. Gerar a string base64
-      const pdfBase64 = await newPdfDoc.saveAsBase64({ dataUri: true });
-
       // 4. Salvar no Firestore na subcoleção 'repertorios' do naipe selecionado
       // Caminho: config/naipes/lista/[selectedNaipeId]/repertorios
       const repertorioRef = collection(db, 'config', 'naipes', 'lista', selectedNaipeId, 'repertorios');
       
       await addDoc(repertorioRef, {
         repertorio: selectedGrade.repertorio,
-        partituras: pdfBase64,
         titulo: selectedGrade.titulo,
+        pdfUrl: selectedGrade.pdfUrl,
+        pagSelecionadas: selectedPages.sort((a,b) => a - b),
         assignedAt: new Date().toISOString()
       });
 
@@ -371,7 +352,7 @@ export function ScoreDistribution() {
     <div className="max-w-5xl mx-auto space-y-6 pb-20 px-4 md:px-0">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-brand tracking-tight">Distribuidor de Grades</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-brand tracking-tight">Distribuidor de partituras</h1>
           <p className="text-[11px] md:text-sm text-slate-500 font-medium">Gerenciamento e organização dos PDFs de Grade da orquestra.</p>
         </div>
       </header>
