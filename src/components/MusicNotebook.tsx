@@ -26,6 +26,7 @@ import {
   useSensors,
   DragEndEvent,
   TouchSensor,
+  DragOverlay,
   defaultDropAnimationSideEffects
 } from '@dnd-kit/core';
 import {
@@ -33,8 +34,7 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable,
-  sortableKeyboardCoordinates as keyboardCoordinates
+  useSortable
 } from '@dnd-kit/sortable';
 import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
@@ -85,13 +85,13 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
+        distance: 8,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 150,
-        tolerance: 15,
+        delay: 200,
+        tolerance: 6,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -99,20 +99,30 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
     })
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const handleDragStart = (event: { active: { id: string } }) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
+    
     if (over && active.id !== over.id) {
       setPages((items) => {
         const oldIndex = items.findIndex((i) => i.id === active.id);
         const newIndex = items.findIndex((i) => i.id === over.id);
-        const newItems = arrayMove(items, oldIndex, newIndex);
-        
-        // Persist order change to localStorage if we want it to be "Saved" automatically or just UI state
-        return newItems;
+        return arrayMove(items, oldIndex, newIndex);
       });
     }
+  }, []);
+
+  const handleDragCancel = () => {
+    setActiveId(null);
   };
 
+  // Função para salvar o estado atual (páginas e anotações)
   const handleSave = () => {
     try {
       const saveData = {
@@ -120,8 +130,11 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
         annotations,
         lastSaved: new Date().toISOString()
       };
+      // O botão "Salvar" guarda o estado atual das suas partituras e anotações no armazenamento local do seu navegador (localStorage). 
+      // Isso significa que se você fechar o app e abrir de novo, suas anotações e a ordem das páginas estarão lá. 
+      // Em uma aplicação de produção, esse botão enviaria os dados para um banco de dados como o Firebase.
       localStorage.setItem(`notebook_save_${title}`, JSON.stringify(saveData));
-      alert('Seu progresso foi salvo localmente! Em uma versão real, isso seria enviado para o servidor Firestore.');
+      alert('Seu progresso foi salvo localmente!');
     } catch (e) {
       console.error('Erro ao salvar:', e);
       alert('Erro ao salvar anotações.');
@@ -302,23 +315,40 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
               <DndContext 
                   sensors={sensors}
                   collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onDragCancel={handleDragCancel}
                   modifiers={[restrictToVerticalAxis, restrictToWindowEdges]}
               >
                   <SortableContext 
                       items={pages.map(p => p.id)}
                       strategy={verticalListSortingStrategy}
                   >
-                      {pages.map((p, i) => (
-                        <SortableNavCard 
-                          key={p.id} 
-                          id={p.id} 
-                          page={p} 
-                          index={i} 
-                          onRemove={() => removePage(p.id)} 
-                        />
-                      ))}
+                      <div className="space-y-4">
+                        {pages.map((p, i) => (
+                          <SortableNavCard 
+                            key={p.id} 
+                            id={p.id} 
+                            page={p} 
+                            index={i} 
+                            onRemove={() => removePage(p.id)} 
+                          />
+                        ))}
+                      </div>
                   </SortableContext>
+
+                  <DragOverlay adjustScale={true}>
+                    {activeId ? (
+                      <div className="w-[224px]"> {/* Match current card width roughly */}
+                        <SortableNavCard 
+                          id={activeId} 
+                          page={pages.find(p => p.id === activeId)!} 
+                          index={pages.findIndex(p => p.id === activeId)}
+                          onRemove={() => {}}
+                        />
+                      </div>
+                    ) : null}
+                  </DragOverlay>
               </DndContext>
             </div>
           </motion.div>
