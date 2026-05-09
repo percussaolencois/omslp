@@ -24,15 +24,22 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent
+  DragEndEvent,
+  TouchSensor,
+  defaultDropAnimationSideEffects
 } from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  verticalListSortingStrategy
+  verticalListSortingStrategy,
+  useSortable,
+  sortableKeyboardCoordinates as keyboardCoordinates
 } from '@dnd-kit/sortable';
+import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
 import { ScorePage } from './ScorePage';
+import { Page } from 'react-pdf';
 import { motion, AnimatePresence } from 'motion/react';
 import { Partitura, NotebookPage, Stroke } from '../types';
 
@@ -78,7 +85,13 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 15,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -92,10 +105,42 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
       setPages((items) => {
         const oldIndex = items.findIndex((i) => i.id === active.id);
         const newIndex = items.findIndex((i) => i.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        
+        // Persist order change to localStorage if we want it to be "Saved" automatically or just UI state
+        return newItems;
       });
     }
   };
+
+  const handleSave = () => {
+    try {
+      const saveData = {
+        pages,
+        annotations,
+        lastSaved: new Date().toISOString()
+      };
+      localStorage.setItem(`notebook_save_${title}`, JSON.stringify(saveData));
+      alert('Seu progresso foi salvo localmente! Em uma versão real, isso seria enviado para o servidor Firestore.');
+    } catch (e) {
+      console.error('Erro ao salvar:', e);
+      alert('Erro ao salvar anotações.');
+    }
+  };
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(`notebook_save_${title}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.pages) setPages(parsed.pages);
+        if (parsed.annotations) setAnnotations(parsed.annotations);
+      } catch (e) {
+        console.error('Erro ao carregar save:', e);
+      }
+    }
+  }, [title]);
 
   const addAnnotation = (pageId: string, stroke: Stroke) => {
     setAnnotations(prev => ({
@@ -237,12 +282,12 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
 
       {/* LAYER 3: ORGANIZER PANEL (DRAWER) - NOW ABSOLUTE OVERLAY */}
       <AnimatePresence>
-        {showOrganizer && showControls && (
+        {showOrganizer && (
           <motion.div 
             initial={{ x: -400, opacity: 0 }}
-            animate={{ x: showControls ? (window.innerWidth < 640 ? 64 : 80) : 0, opacity: 1 }}
+            animate={{ x: showControls ? (window.innerWidth < 640 ? 48 : 56) : 0, opacity: 1 }}
             exit={{ x: -400, opacity: 0 }}
-            className="fixed top-0 bottom-0 w-64 bg-slate-800/95 backdrop-blur-md border-r border-slate-700 flex flex-col h-screen shrink-0 z-[90] shadow-2xl"
+            className="fixed top-0 bottom-0 w-64 bg-slate-900/98 backdrop-blur-xl border-r border-slate-800 flex flex-col h-screen shrink-0 z-[90] shadow-2xl"
           >
             <div className="p-5 border-b border-slate-700 flex items-center justify-between bg-slate-900/50">
               <div>
@@ -258,6 +303,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
                   sensors={sensors}
                   collisionDetection={closestCenter}
                   onDragEnd={handleDragEnd}
+                  modifiers={[restrictToVerticalAxis, restrictToWindowEdges]}
               >
                   <SortableContext 
                       items={pages.map(p => p.id)}
@@ -309,19 +355,40 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
              </div>
              
              <div className="flex flex-col gap-2 pointer-events-auto">
+                {/* 1: Adicionar Partitura */}
+                <button 
+                  onClick={() => setShowAddMenu(true)}
+                  className="p-3 bg-white/90 backdrop-blur text-slate-800 rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-white/20"
+                  title="Adicionar Partitura"
+                >
+                  <Plus size={20} />
+                </button>
+
+                {/* 2: Ordenador de Páginas */}
+                <button 
+                  onClick={() => setShowOrganizer(!showOrganizer)}
+                  className={`p-3 backdrop-blur rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border ${showOrganizer ? 'bg-brand text-white border-brand/20' : 'bg-white/90 text-slate-800 border-white/20'}`}
+                  title="Ordenar Páginas"
+                >
+                  <List size={20} />
+                </button>
+
+                {/* 3: Mostrar/Esconder Ferramentas */}
                 <button 
                   onClick={() => setShowControls(!showControls)}
-                  className="p-4 bg-slate-900/90 backdrop-blur text-white rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all border border-slate-700"
+                  className="p-3 bg-slate-900/90 backdrop-blur text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-slate-700"
+                  title={showControls ? "Esconder Ferramentas" : "Mostrar Ferramentas"}
                 >
-                  {showControls ? <ArrowLeft size={24} /> : <List size={24} />}
+                  {showControls ? <ArrowLeft size={20} /> : <MousePointer2 size={20} />}
                 </button>
+
+                {/* 4: Salvar */}
                 <button 
-                  className="p-4 bg-brand text-white rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all border border-brand/20 shadow-brand/40"
-                  onClick={() => {
-                    alert('Anotações salvas com sucesso!');
-                  }}
+                  className="p-3 bg-brand text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-brand/20 shadow-brand/40"
+                  onClick={handleSave}
+                  title="Salvar"
                 >
-                  <Save size={24} />
+                  <Save size={20} />
                 </button>
              </div>
         </div>
@@ -430,29 +497,44 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
 }
 
 function SortableNavCard({ id, page, index, onRemove }: { id: string, page: NotebookPage, index: number, onRemove: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
-      className="bg-slate-900 rounded-xl p-3 flex items-center gap-3 group relative border border-slate-700/50"
+      className={`bg-slate-900/40 backdrop-blur rounded-2xl p-2 flex items-center gap-3 group relative border transition-all ${isDragging ? 'border-brand shadow-2xl scale-105' : 'border-white/5 hover:border-brand/30'}`}
     >
-      <div {...attributes} {...listeners} className="p-1 cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400">
+      <div {...attributes} {...listeners} className="p-2 cursor-grab active:cursor-grabbing text-slate-500 hover:text-white transition-colors">
         <List size={16} />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Pág {page.originalPageNumber}</p>
-        <p className="text-xs font-bold text-slate-300 truncate">ID: {page.id.split('-')[0]}</p>
+      
+      <div className="w-12 h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 shadow-lg border border-white/10">
+        <Document file={page.pdfUrl}>
+          <Page 
+            pageNumber={page.originalPageNumber} 
+            width={48}
+            renderTextLayer={false} 
+            renderAnnotationLayer={false}
+          />
+        </Document>
       </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-[9px] font-black text-brand uppercase tracking-widest leading-none mb-1">Pág {index + 1}</p>
+        <p className="text-[10px] font-bold text-slate-400 truncate opacity-60">Orig: {page.originalPageNumber}</p>
+      </div>
+
       <button 
         onClick={onRemove}
-        className="p-1.5 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+        className="p-2 text-slate-500 hover:text-red-400 transition-all active:scale-90"
       >
         <Trash2 size={16} />
       </button>
