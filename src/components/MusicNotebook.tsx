@@ -140,90 +140,95 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
 
   return (
     <div className="fixed inset-0 bg-slate-100 z-50 flex flex-row h-screen overflow-hidden text-slate-900 font-sans">
-      {/* LAYER 3: SIDEBAR CONTROLS (LEFT) - NOW ABSOLUTE OVERLAY */}
+      {/* LAYER 3: SIDEBAR CONTROLS (LEFT) - COMPACT FOR TABLET/MOBILE */}
       <AnimatePresence>
         {showControls && (
           <motion.aside 
             initial={{ x: -100, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -100, opacity: 0 }}
-            className="fixed left-0 top-0 bottom-0 w-16 sm:w-20 bg-slate-900/95 backdrop-blur-md border-r border-slate-800 flex flex-col items-center py-6 shrink-0 z-[100] shadow-2xl"
+            className="fixed left-0 top-0 bottom-0 w-12 sm:w-14 bg-slate-900/95 backdrop-blur-md border-r border-slate-800 flex flex-col items-center py-4 shrink-0 z-[100] shadow-2xl"
           >
-            <button 
-              onClick={onClose}
-              className="p-3 mb-8 bg-slate-800 hover:bg-slate-700 rounded-2xl text-slate-300 transition-all border border-slate-700 shadow-lg active:scale-90"
-            >
-              <ArrowLeft size={20} />
-            </button>
-
-            <div className="flex flex-col gap-3 flex-1">
+            <div className="flex flex-col gap-2 flex-1">
+              {/* Modo de Navegação (Essencial para Scroll) */}
               <ToolButton 
                 active={tool === 'none'} 
                 onClick={() => setTool('none')}
-                icon={<MousePointer2 size={20} />}
-                label="Navegar"
+                icon={<MousePointer2 size={18} />}
+                compact
               />
               
-              <div className="my-2 border-t border-slate-800/50 w-8 mx-auto" />
+              <div className="my-2 border-t border-slate-800/50 w-6 mx-auto" />
 
+              {/* 1: Lápis */}
               <ToolButton 
                 active={tool === 'pencil'} 
                 onClick={() => setTool('pencil')}
-                icon={<Pencil size={20} />}
-                label="Lapis"
+                icon={<Pencil size={18} />}
+                compact
               />
+              {/* 2: Marcador */}
               <ToolButton 
                 active={tool === 'highlighter'} 
                 onClick={() => setTool('highlighter')}
-                icon={<Highlighter size={20} />}
-                label="Marca"
+                icon={<Highlighter size={18} />}
+                compact
               />
+              {/* 3: Borracha */}
               <ToolButton 
                 active={tool === 'eraser'} 
                 onClick={() => setTool('eraser')}
-                icon={<Eraser size={20} />}
-                label="Apaga"
+                icon={<Eraser size={18} />}
+                compact
               />
               
-              <div className="my-4 border-t border-slate-800/50 w-8 mx-auto" />
+              <div className="my-2 border-t border-slate-800/50 w-6 mx-auto" />
 
-              <ColorCircle color="#000000" active={activeColor === '#000000'} onClick={() => setActiveColor('#000000')} />
-              <ColorCircle color="#ef4444" active={activeColor === '#ef4444'} onClick={() => setActiveColor('#ef4444')} />
-              <ColorCircle color="#3b82f6" active={activeColor === '#3b82f6'} onClick={() => setActiveColor('#3b82f6')} />
-              <ColorCircle color="#eab308" active={activeColor === '#eab308'} onClick={() => {
-                 setActiveColor('#eab308');
-                 if (tool === 'pencil') setTool('highlighter');
-              }} />
-              
-              <div className="my-4 border-t border-slate-800/50 w-8 mx-auto" />
-
-              <button 
-                onClick={() => setShowOrganizer(!showOrganizer)}
-                title="Organizador de Páginas"
-                className={`p-3 rounded-2xl transition-all shadow-md active:scale-95 ${showOrganizer ? 'bg-brand text-white' : 'text-slate-400 hover:bg-slate-800'}`}
-              >
-                <List size={22} />
-              </button>
+              {/* 4: Seletor de Cores */}
+              <div className="flex flex-col gap-2 items-center">
+                <ColorCircle color="#000000" active={activeColor === '#000000'} onClick={() => setActiveColor('#000000')} compact />
+                <ColorCircle color="#ef4444" active={activeColor === '#ef4444'} onClick={() => setActiveColor('#ef4444')} compact />
+                <ColorCircle color="#3b82f6" active={activeColor === '#3b82f6'} onClick={() => setActiveColor('#3b82f6')} compact />
+                <div className="relative group/color-picker">
+                   <div 
+                    className="w-6 h-6 rounded-full border border-slate-700 flex items-center justify-center overflow-hidden shadow-inner"
+                    style={{ backgroundColor: activeColor }}
+                   >
+                     <input 
+                      type="color" 
+                      value={activeColor} 
+                      onChange={(e) => setActiveColor(e.target.value)}
+                      className="w-10 h-10 cursor-pointer border-none bg-transparent opacity-0 absolute inset-0" 
+                     />
+                   </div>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-3 mt-auto">
+            <div className="flex flex-col gap-2 mt-auto pb-4">
+              {/* 5: Zoom In/Out */}
               <button 
-                onClick={() => setScale(s => Math.min(2.5, s + 0.1))}
-                className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl transition-all border border-slate-700 shadow-md active:scale-90"
+                onClick={() => setScale(s => Math.min(3.0, s + 0.1))}
+                className="p-2 text-slate-500 hover:text-white transition-all active:scale-90"
               >
                 <ZoomIn size={18} />
               </button>
               <button 
                 onClick={() => setScale(s => Math.max(0.2, s - 0.1))}
-                className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl transition-all border border-slate-700 shadow-md active:scale-90"
+                className="p-2 text-slate-500 hover:text-white transition-all active:scale-90"
               >
                 <ZoomOut size={18} />
               </button>
+              
+              <div className="my-2 border-t border-slate-800/50 w-6 mx-auto" />
+
+              {/* 6: Botão Voltar */}
               <button 
-                onClick={toggleFullscreen}
-                className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl transition-all border border-slate-700 shadow-md active:scale-90"
+                onClick={onClose}
+                className="p-2.5 bg-red-500 text-white hover:bg-red-600 rounded-xl transition-all shadow-lg shadow-red-500/20 active:scale-90"
+                title="Sair do Caderno"
               >
-                <Maximize2 size={18} />
+                <ArrowLeft size={18} />
               </button>
             </div>
           </motion.aside>
@@ -455,26 +460,28 @@ function SortableNavCard({ id, page, index, onRemove }: { id: string, page: Note
   );
 }
 
-function ToolButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label?: string }) {
+function ToolButton({ active, onClick, icon, label, compact }: { active: boolean, onClick: () => void, icon: React.ReactNode, label?: string, compact?: boolean }) {
   return (
     <button 
       onClick={onClick}
       className={`
-        flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl transition-all duration-300
+        flex flex-col items-center justify-center gap-1 p-2 sm:p-3 rounded-xl sm:rounded-2xl transition-all duration-300
         ${active ? 'bg-brand text-white shadow-xl shadow-brand/30 scale-105' : 'text-slate-400 hover:text-white hover:bg-slate-800'}
+        ${compact ? 'w-8 h-8 sm:w-10 sm:h-10' : ''}
       `}
     >
       {icon}
-      {label && <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>}
+      {label && !compact && <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>}
     </button>
   );
 }
 
-function ColorCircle({ color, active, onClick }: { color: string, active: boolean, onClick: () => void }) {
+function ColorCircle({ color, active, onClick, compact }: { color: string, active: boolean, onClick: () => void, compact?: boolean }) {
+  const size = compact ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-8 h-8';
   return (
     <button 
       onClick={onClick}
-      className={`w-8 h-8 rounded-full border-2 border-slate-800 transition-all ${active ? 'scale-125 border-white shadow-lg' : 'hover:scale-110'}`}
+      className={`${size} rounded-full border-2 border-slate-800 transition-all ${active ? 'scale-125 border-white shadow-lg' : 'hover:scale-110'}`}
       style={{ backgroundColor: color }}
     />
   );
