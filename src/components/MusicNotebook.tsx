@@ -11,6 +11,7 @@ import {
   ZoomIn, 
   ZoomOut,
   Maximize2,
+  Minimize2,
   Trash2,
   List,
   MousePointer2,
@@ -157,6 +158,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
   const [showControls, setShowControls] = useState(true);
   const [showOrganizer, setShowOrganizer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -322,7 +324,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
     <div className="fixed inset-0 bg-slate-100 z-50 flex flex-row h-screen overflow-hidden text-slate-900 font-sans">
       {/* LAYER 3: SIDEBAR CONTROLS (LEFT) - COMPACT FOR TABLET/MOBILE */}
       <AnimatePresence>
-        {showControls && (
+        {showControls && !isFullScreen && (
           <motion.aside 
             initial={{ x: -100, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -417,7 +419,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
 
       {/* LAYER 3: ORGANIZER PANEL (DRAWER) - NOW ABSOLUTE OVERLAY */}
       <AnimatePresence>
-        {showOrganizer && (
+        {showOrganizer && !isFullScreen && (
           <motion.div 
             initial={{ x: -400, opacity: 0 }}
             animate={{ x: showControls ? (window.innerWidth < 640 ? 48 : 56) : 0, opacity: 1 }}
@@ -480,7 +482,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
       {/* LAYER 1 & 2: MAIN VIEWPORT (PDF + CANVAS) - ABSOLUTELY 100% WIDTH */}
       <main 
         ref={mainRef}
-        className={`flex-1 w-full relative bg-slate-300 overflow-y-auto selection:bg-transparent scroll-smooth custom-scrollbar overflow-x-hidden ${showOrganizer ? 'select-none !overflow-hidden' : ''}`}
+        className={`flex-1 w-full relative bg-slate-300 overflow-y-auto selection:bg-transparent scroll-smooth custom-scrollbar overflow-x-hidden ${showOrganizer && !isFullScreen ? 'select-none !overflow-hidden' : ''}`}
       >
         <style>{`
           .react-pdf__Page {
@@ -496,52 +498,67 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
         `}</style>
         {/* TOP HUD (FLOATING) */}
         <div className="fixed top-0 left-0 right-0 p-4 pointer-events-none z-40 flex justify-between items-start">
-             <div className="p-3 bg-white/80 backdrop-blur-md shadow-xl rounded-2xl border border-white/20 pointer-events-auto flex items-center gap-3">
-                <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center text-white shadow-brand/20 shadow-lg">
-                   <BookOpen size={18} />
-                </div>
-                <div>
-                   <h2 className="font-black text-slate-900 uppercase text-[10px] tracking-widest">{title}</h2>
-                   <p className="text-[9px] text-slate-500 font-bold uppercase">Caderno Ativo</p>
-                </div>
-             </div>
+             {!isFullScreen && (
+               <div className="p-3 bg-white/80 backdrop-blur-md shadow-xl rounded-2xl border border-white/20 pointer-events-auto flex items-center gap-3">
+                  <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center text-white shadow-brand/20 shadow-lg">
+                     <BookOpen size={18} />
+                  </div>
+                  <div>
+                     <h2 className="font-black text-slate-900 uppercase text-[10px] tracking-widest">{title}</h2>
+                     <p className="text-[9px] text-slate-500 font-bold uppercase">Caderno Ativo</p>
+                  </div>
+               </div>
+             )}
              
              <div className="flex flex-col gap-2 pointer-events-auto">
-                {/* 1: Adicionar Partitura */}
-                <button 
-                  onClick={() => setShowAddMenu(true)}
-                  className="p-3 bg-white/90 backdrop-blur text-slate-800 rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-white/20"
-                  title="Adicionar Partitura"
-                >
-                  <Plus size={20} />
-                </button>
+                {!isFullScreen && (
+                  <>
+                    {/* 1: Adicionar Partitura */}
+                    <button 
+                      onClick={() => setShowAddMenu(true)}
+                      className="p-3 bg-white/90 backdrop-blur text-slate-800 rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-white/20"
+                      title="Adicionar Partitura"
+                    >
+                      <Plus size={20} />
+                    </button>
 
-                {/* 2: Ordenador de Páginas */}
-                <button 
-                  onClick={() => setShowOrganizer(!showOrganizer)}
-                  className={`p-3 backdrop-blur rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border ${showOrganizer ? 'bg-brand text-white border-brand/20' : 'bg-white/90 text-slate-800 border-white/20'}`}
-                  title="Ordenar Páginas"
-                >
-                  <List size={20} />
-                </button>
+                    {/* 2: Ordenador de Páginas */}
+                    <button 
+                      onClick={() => setShowOrganizer(!showOrganizer)}
+                      className={`p-3 backdrop-blur rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border ${showOrganizer ? 'bg-brand text-white border-brand/20' : 'bg-white/90 text-slate-800 border-white/20'}`}
+                      title="Ordenar Páginas"
+                    >
+                      <List size={20} />
+                    </button>
 
-                {/* 3: Mostrar/Esconder Ferramentas */}
-                <button 
-                  onClick={() => setShowControls(!showControls)}
-                  className="p-3 bg-slate-900/90 backdrop-blur text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-slate-700"
-                  title={showControls ? "Esconder Ferramentas" : "Mostrar Ferramentas"}
-                >
-                  {showControls ? <ArrowLeft size={20} /> : <MousePointer2 size={20} />}
-                </button>
+                    {/* 3: Mostrar/Esconder Ferramentas */}
+                    <button 
+                      onClick={() => setShowControls(!showControls)}
+                      className="p-3 bg-slate-900/90 backdrop-blur text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-slate-700"
+                      title={showControls ? "Esconder Ferramentas" : "Mostrar Ferramentas"}
+                    >
+                      {showControls ? <ArrowLeft size={20} /> : <MousePointer2 size={20} />}
+                    </button>
 
-                {/* 4: Salvar */}
+                    {/* 4: Salvar */}
+                    <button 
+                      disabled={isSaving}
+                      className={`p-3 text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-brand/20 shadow-brand/40 ${isSaving ? 'bg-brand/50 cursor-wait' : 'bg-brand'}`}
+                      onClick={handleSave}
+                      title="Salvar"
+                    >
+                      <Save size={20} className={isSaving ? 'animate-pulse' : ''} />
+                    </button>
+                  </>
+                )}
+
+                {/* 5: Tela Cheia */}
                 <button 
-                  disabled={isSaving}
-                  className={`p-3 text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-brand/20 shadow-brand/40 ${isSaving ? 'bg-brand/50 cursor-wait' : 'bg-brand'}`}
-                  onClick={handleSave}
-                  title="Salvar"
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  className={`p-3 backdrop-blur rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border ${isFullScreen ? 'bg-brand text-white border-brand/20' : 'bg-slate-900/90 text-white border-slate-700'}`}
+                  title={isFullScreen ? "Sair da Tela Cheia" : "Tela Cheia"}
                 >
-                  <Save size={20} className={isSaving ? 'animate-pulse' : ''} />
+                   {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
                 </button>
              </div>
         </div>
