@@ -65,8 +65,9 @@ export function ScorePage({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Scaling factor between normalized units and physical pixels
-    const renderScale = calculatedWidth / dimensions.width;
+    // Scaling factor: How much to scale from our reference system (1000px width)
+    // to the actual displayed size on screen.
+    const renderScale = calculatedWidth / 1000;
 
     ctx.save();
     ctx.scale(renderScale, renderScale);
@@ -80,7 +81,7 @@ export function ScorePage({
     }
     
     ctx.restore();
-  }, [annotations, currentStroke, dimensions, calculatedWidth, scale]);
+  }, [annotations, currentStroke, dimensions, calculatedWidth]);
 
   function drawStroke(
     ctx: CanvasRenderingContext2D,
@@ -91,6 +92,7 @@ export function ScorePage({
   ) {
     if (points.length === 0) return;
 
+    // Use absolute units for getStroke, then the transform handles scaling
     const strokePoints = getStroke(points, {
       size: width,
       thinning: type === 'pencil' ? 0.5 : 0,
@@ -120,13 +122,14 @@ export function ScorePage({
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     
-    // Scale normalized coordinates
-    const renderScale = calculatedWidth / dimensions.width;
+    // Convert current pixel coordinate to reference coordinate (0-1000)
+    const renderScale = calculatedWidth / 1000;
     const x = (e.clientX - rect.left) / renderScale;
     const y = (e.clientY - rect.top) / renderScale;
 
     if (tool === 'eraser') {
       const hitStroke = annotations.find(stroke => {
+        // Eraser hit detection in reference space
         return stroke.points.some(p => Math.hypot(p.x - x, p.y - y) < 15);
       });
       if (hitStroke) {
@@ -143,7 +146,7 @@ export function ScorePage({
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     
-    const renderScale = calculatedWidth / dimensions.width;
+    const renderScale = calculatedWidth / 1000;
     const x = (e.clientX - rect.left) / renderScale;
     const y = (e.clientY - rect.top) / renderScale;
     

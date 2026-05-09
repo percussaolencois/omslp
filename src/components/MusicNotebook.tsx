@@ -92,6 +92,59 @@ interface MusicNotebookProps {
   title: string;
 }
 
+interface SortableNavCardProps {
+  id: string;
+  page: NotebookPage;
+  index: number;
+  onRemove: () => void;
+}
+
+const SortableNavCard: React.FC<SortableNavCardProps> = ({ id, page, index, onRemove }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className={`bg-slate-900/40 backdrop-blur rounded-2xl p-2 flex items-center gap-3 group relative border transition-all select-none ${isDragging ? 'border-brand shadow-2xl scale-105 z-50' : 'border-white/5 hover:border-brand/30'}`}
+    >
+      <div {...attributes} {...listeners} className="p-2 cursor-grab active:cursor-grabbing text-slate-500 hover:text-white transition-colors touch-none">
+        <List size={16} />
+      </div>
+      
+      <div className="w-12 h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 shadow-lg border border-white/10">
+        <Document file={page.pdfUrl}>
+          <Page 
+            pageNumber={page.originalPageNumber} 
+            width={48}
+            renderTextLayer={false} 
+            renderAnnotationLayer={false}
+          />
+        </Document>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-[9px] font-black text-brand uppercase tracking-widest leading-none mb-1">Pág {index + 1}</p>
+        <p className="text-[10px] font-bold text-slate-400 truncate opacity-60">Orig: {page.originalPageNumber}</p>
+      </div>
+
+      <button 
+        onClick={onRemove}
+        className="p-2 text-slate-500 hover:text-red-400 transition-all active:scale-90"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
+};
+
 export function MusicNotebook({ initialPages, availablePartituras, onClose, title }: MusicNotebookProps) {
   const [pages, setPages] = useState<NotebookPage[]>(initialPages);
   const [annotations, setAnnotations] = useState<PageAnnotation>({});
@@ -592,52 +645,6 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
           </div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function SortableNavCard({ id, page, index, onRemove }: { id: string, page: NotebookPage, index: number, onRemove: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 100 : 1,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      className={`bg-slate-900/40 backdrop-blur rounded-2xl p-2 flex items-center gap-3 group relative border transition-all select-none ${isDragging ? 'border-brand shadow-2xl scale-105 z-50' : 'border-white/5 hover:border-brand/30'}`}
-    >
-      <div {...attributes} {...listeners} className="p-2 cursor-grab active:cursor-grabbing text-slate-500 hover:text-white transition-colors touch-none">
-        <List size={16} />
-      </div>
-      
-      <div className="w-12 h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 shadow-lg border border-white/10">
-        <Document file={page.pdfUrl}>
-          <Page 
-            pageNumber={page.originalPageNumber} 
-            width={48}
-            renderTextLayer={false} 
-            renderAnnotationLayer={false}
-          />
-        </Document>
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="text-[9px] font-black text-brand uppercase tracking-widest leading-none mb-1">Pág {index + 1}</p>
-        <p className="text-[10px] font-bold text-slate-400 truncate opacity-60">Orig: {page.originalPageNumber}</p>
-      </div>
-
-      <button 
-        onClick={onRemove}
-        className="p-2 text-slate-500 hover:text-red-400 transition-all active:scale-90"
-      >
-        <Trash2 size={16} />
-      </button>
     </div>
   );
 }

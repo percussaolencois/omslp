@@ -90,19 +90,19 @@ service cloud.firestore {
 
     // Sheet Music Collection
     match /sheet_music/{musicId} {
-      allow read: if isAtivo();
+      allow read: if isSignedIn();
       allow create, update, delete: if isAdmin() && isValidSheetMusic(request.resource.data);
     }
 
     // Distributions Collection
     match /distributions/{distId} {
-      allow read: if isAtivo();
+      allow read: if isSignedIn();
       allow create, update, delete: if isAdmin() && isValidDistribution(request.resource.data);
     }
 
     // Grades Collection
     match /grades/{gradeId} {
-      allow read: if isAtivo();
+      allow read: if isSignedIn();
       allow create, update, delete: if canManageGrades() && isValidGrade(request.resource.data);
     }
 
@@ -113,6 +113,27 @@ service cloud.firestore {
       allow create: if isAtivo() && isValidNotebookSave(request.resource.data);
       allow update: if isAtivo() && resource.data.userId == request.auth.uid && isValidNotebookSave(request.resource.data);
       allow delete: if isAtivo() && resource.data.userId == request.auth.uid;
+    }
+
+    // Config Collection (Naipes, Integrantes, Repertórios)
+    match /config/naipes/lista/{naipeId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+
+      match /integrantes/{memberId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+
+        match /{repertorio}/{docId} {
+          allow read: if isSignedIn();
+          allow write: if isAdmin();
+        }
+      }
+
+      match /repertorios/{repId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
     }
   }
 }
