@@ -90,8 +90,8 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 6,
+        delay: 100,
+        tolerance: 10,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -358,7 +358,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
       {/* LAYER 1 & 2: MAIN VIEWPORT (PDF + CANVAS) - ABSOLUTELY 100% WIDTH */}
       <main 
         ref={mainRef}
-        className="flex-1 w-full relative bg-slate-300 overflow-y-auto selection:bg-transparent scroll-smooth custom-scrollbar overflow-x-hidden"
+        className={`flex-1 w-full relative bg-slate-300 overflow-y-auto selection:bg-transparent scroll-smooth custom-scrollbar overflow-x-hidden ${showOrganizer ? 'select-none !overflow-hidden' : ''}`}
       >
         <style>{`
           .react-pdf__Page {
@@ -540,9 +540,9 @@ function SortableNavCard({ id, page, index, onRemove }: { id: string, page: Note
     <div 
       ref={setNodeRef} 
       style={style} 
-      className={`bg-slate-900/40 backdrop-blur rounded-2xl p-2 flex items-center gap-3 group relative border transition-all ${isDragging ? 'border-brand shadow-2xl scale-105' : 'border-white/5 hover:border-brand/30'}`}
+      className={`bg-slate-900/40 backdrop-blur rounded-2xl p-2 flex items-center gap-3 group relative border transition-all select-none ${isDragging ? 'border-brand shadow-2xl scale-105 z-50' : 'border-white/5 hover:border-brand/30'}`}
     >
-      <div {...attributes} {...listeners} className="p-2 cursor-grab active:cursor-grabbing text-slate-500 hover:text-white transition-colors">
+      <div {...attributes} {...listeners} className="p-2 cursor-grab active:cursor-grabbing text-slate-500 hover:text-white transition-colors touch-none">
         <List size={16} />
       </div>
       
