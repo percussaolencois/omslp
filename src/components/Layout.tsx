@@ -32,6 +32,8 @@ export function Navbar() {
   const canSeeGrades = userRole === 'Administrativo' || userRole === 'Diretoria' || userRole === 'Maestro';
   const canSeePartsDist = userRole === 'Chefe de Naipe' || userRole === 'Diretoria';
   const isDocOrAdmin = userRole === 'Administrativo' || userRole === 'Diretoria';
+  const isChefDeNaipe = userRole === 'Chefe de Naipe';
+  const canSeeIntegrantes = isDocOrAdmin || isChefDeNaipe;
 
   const navItems = [
     { label: 'Home', path: '/', icon: Home },
@@ -73,7 +75,7 @@ export function Navbar() {
       label: 'Integrantes', 
       path: '#', 
       icon: User, 
-      visible: isDocOrAdmin,
+      visible: canSeeIntegrantes,
       submenu: [
         { 
           label: 'Naipes', 
@@ -81,7 +83,8 @@ export function Navbar() {
           icon: FileStack,
           visible: isDocOrAdmin 
         },
-        { label: 'Músicos', path: '/gerenciamento-musicos', icon: User },
+        { label: 'Músicos', path: '/gerenciamento-musicos', icon: User, visible: isDocOrAdmin },
+        { label: 'Meu Naipe', path: '/meu-naipe', icon: User, visible: isChefDeNaipe }
       ].filter(sub => sub.visible !== false)
     },
     { label: 'Meu Perfil', path: '/perfil', icon: User },
@@ -184,9 +187,9 @@ export function Navbar() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden bg-white border-t border-slate-200 overflow-hidden"
+              className="md:hidden bg-white border-t border-slate-200 overflow-y-auto max-h-[calc(100vh-80px)]"
             >
-              <div className="px-4 py-4 space-y-2">
+              <div className="px-4 py-4 space-y-3">
                 {navItems.map((item) => (
                   <div key={item.label}>
                     {item.submenu ? (

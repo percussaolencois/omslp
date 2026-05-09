@@ -17,6 +17,7 @@ import { GradesManagement } from './pages/GradesManagement';
 import { MusicRequest } from './pages/MusicRequest';
 import { NaipeManagement } from './pages/NaipeManagement';
 import { UserManagement } from './pages/UserManagement';
+import { MeuNaipe } from './pages/MeuNaipe';
 import { Profile } from './pages/Profile';
 import { Register } from './pages/Register';
 
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/gerenciamento-grades" element={<PrivateRoute><GradesManagement /></PrivateRoute>} />
           <Route path="/gerenciamento-naipes" element={<PrivateRoute><NaipeManagement /></PrivateRoute>} />
           <Route path="/gerenciamento-musicos" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
+          <Route path="/meu-naipe" element={<PrivateRoute><MeuNaipe /></PrivateRoute>} />
           <Route path="/perfil" element={<PrivateRoute><Profile /></PrivateRoute>} />
           
           <Route path="*" element={<Navigate to="/" />} />

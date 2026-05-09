@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileStack, FileText, Loader2, CheckCircle2, Folder, ChevronDown } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, setDoc, writeBatch, increment, arrayUnion } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import * as pdfjs from 'pdfjs-dist';
+import { PDFDocument } from 'pdf-lib';
 
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -160,8 +161,12 @@ const PDFPageRenderer: React.FC<PDFPageRendererProps> = ({ pageNumber, pdf }) =>
 export function PartituraManagement() {
   const { profile } = useAuth();
   const [partituras, setPartituras] = useState<Partitura[]>([]);
+  const [integrantes, setIntegrantes] = useState<any[]>([]);
   const [selectedPartituraId, setSelectedPartituraId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [loadingIntegrantes, setLoadingIntegrantes] = useState(true);
+  const [atribuindo, setAtribuindo] = useState(false);
+  const [selectedIntegranteId, setSelectedIntegranteId] = useState<string | null>(null);
 
   // PDF Viewer State
   const [pdfDoc, setPdfDoc] = useState<pdfjs.PDFDocumentProxy | null>(null);
@@ -172,6 +177,7 @@ export function PartituraManagement() {
   useEffect(() => {
     if (profile?.naipe) {
       fetchPartituras();
+      fetchIntegrantes();
     }
   }, [profile]);
 
@@ -208,6 +214,35 @@ export function PartituraManagement() {
     }
   };
 
+  const fetchIntegrantes = async () => {
+    setLoadingIntegrantes(true);
+    try {
+      // 1. Achar ID do Naipe
+      const naipesRef = collection(db, 'config', 'naipes', 'lista');
+      const naipeQuery = query(naipesRef, where('naipe', '==', profile?.naipe));
+      const naipeSnapshot = await getDocs(naipeQuery);
+      
+      if (!naipeSnapshot.empty) {
+        const naipeId = naipeSnapshot.docs[0].id;
+        
+        // 2. Fetch Integrantes
+        const integrantesRef = collection(db, 'config', 'naipes', 'lista', naipeId, 'integrantes');
+        const querySnapshot = await getDocs(integrantesRef);
+        
+        const integrantesList = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setIntegrantes(integrantesList);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar integrantes:", error);
+    } finally {
+      setLoadingIntegrantes(false);
+    }
+  };
+
   const loadPdf = async (base64: string) => {
     setLoadingPdf(true);
     setPdfDoc(null);
@@ -228,6 +263,63 @@ export function PartituraManagement() {
       alert("Erro ao carregar o PDF.");
     } finally {
       setLoadingPdf(false);
+    }
+  };
+
+  const handleAtribuirPartitura = async () => {
+    if (!selectedIntegranteId || selectedPages.length === 0 || !selectedPartituraId) return;
+    setAtribuindo(true);
+    try {
+      const selectedPartitura = partituras.find(p => p.id === selectedPartituraId);
+      if (!selectedPartitura) return;
+      
+      const { partituras: base64, titulo, repertorio } = selectedPartitura;
+      const base64Data = base64.includes('base64,') ? base64.split('base64,')[1] : base64;
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const pdf = await PDFDocument.load(bytes);
+      const newPdf = await PDFDocument.create();
+      
+      const copiedPages = await newPdf.copyPages(pdf, selectedPages.map(p => p - 1));
+      copiedPages.forEach(p => newPdf.addPage(p));
+      
+      const pdfBytes = await newPdf.save();
+      const newBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+      
+      // Salvar no Firestore
+      const naipesRef = collection(db, 'config', 'naipes', 'lista');
+      const naipeQuery = query(naipesRef, where('naipe', '==', profile?.naipe));
+      const naipeSnapshot = await getDocs(naipeQuery);
+      if (naipeSnapshot.empty) return;
+      const naipeId = naipeSnapshot.docs[0].id;
+      
+      const batch = writeBatch(db);
+      const integranteRef = doc(db, 'config', 'naipes', 'lista', naipeId, 'integrantes', selectedIntegranteId);
+      const path = doc(db, 'config', 'naipes', 'lista', naipeId, 'integrantes', selectedIntegranteId, repertorio, selectedPartituraId);
+      
+      batch.set(path, {
+        titulo: titulo,
+        base64: `data:application/pdf;base64,${newBase64}`
+      });
+      batch.update(integranteRef, {
+        totalPartituras: increment(1),
+        repertorios: arrayUnion(repertorio)
+      });
+      
+      await batch.commit();
+      alert('Partitura atribuída com sucesso!');
+      setSelectedIntegranteId(null);
+      setSelectedPages([]);
+      setSelectedPartituraId('');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao atribuir partitura.');
+    } finally {
+      setAtribuindo(false);
     }
   };
 
@@ -365,41 +457,48 @@ export function PartituraManagement() {
             animate={{ opacity: 1, x: 0 }}
             className="space-y-6"
           >
-            {/* Pastas dos Naipes */}
+            {/* Integrantes do Naipe */}
             <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-50 bg-slate-50/50">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Pasta do Naipe</h3>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Integrantes do Naipe</h3>
               </div>
               
-              <div className="p-4">
-                  <div className="w-full flex items-center gap-4 p-4 rounded-2xl border bg-brand/5 border-brand ring-4 ring-brand/5 shadow-sm text-left relative">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand text-white scale-110">
-                        <Folder size={20} fill="currentColor" fillOpacity={0.1} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-sm text-brand">{profile?.naipe?.toUpperCase() || 'NAIPE'}</p>
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Naipe Selecionado</p>
-                      </div>
-                      <div className="bg-brand text-white rounded-full p-1 shadow-sm">
-                        <CheckCircle2 size={12} strokeWidth={4} />
-                      </div>
-                  </div>
+              <div className="p-4 space-y-3">
+                {loadingIntegrantes ? (
+                  <p className="text-xs text-slate-400">Carregando...</p>
+                ) : integrantes.length > 0 ? (
+                  integrantes.map((m) => (
+                    <div 
+                      key={m.id} 
+                      onClick={() => setSelectedIntegranteId(m.id === selectedIntegranteId ? null : m.id)}
+                      className={cn(
+                          "flex items-center gap-3 p-2 rounded-xl cursor-pointer border transition-all",
+                          m.id === selectedIntegranteId ? "bg-brand/5 border-brand" : "border-transparent hover:bg-slate-50"
+                      )}
+                    >
+                        <img 
+                          src={m.fotoUrl || 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=100&h=100&fit=crop'} 
+                          className="w-10 h-10 rounded-lg object-cover bg-slate-100"
+                          alt={m.Nome}
+                        />
+                        <p className={cn("font-bold text-sm", m.id === selectedIntegranteId ? "text-brand" : "text-slate-700")}>{m.Nome}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400">Nenhum integrante.</p>
+                )}
               </div>
             </div>
 
-            {/* Informações */}
-            <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-50 bg-slate-50/50">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Informações</h3>
-              </div>
-              
-              <div className="p-6 space-y-4">
-                  <div>
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Total de Partituras</p>
-                    <p className="font-bold text-slate-700">{partituras.length}</p>
-                  </div>
-              </div>
-            </div>
+            {/* Botão de Ação */}
+            <button 
+              disabled={!selectedIntegranteId || selectedPages.length === 0 || !selectedPartituraId || atribuindo}
+              className="w-full bg-brand text-white py-4 rounded-2xl font-bold text-sm disabled:opacity-50 hover:bg-brand/90 transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
+              onClick={handleAtribuirPartitura}
+            >
+                {atribuindo && <Loader2 size={16} className="animate-spin" />}
+                {atribuindo ? 'Atribuindo...' : 'Atribuir partitura'}
+            </button>
           </motion.div>
         </div>
       </div>

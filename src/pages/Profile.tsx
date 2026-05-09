@@ -28,12 +28,13 @@ export function Profile() {
     naipe: profile?.naipe || '',
     tipoAcesso: profile?.tipoAcesso || 'Músico',
     fotoUrl: profile?.fotoUrl || '',
+    telefone: profile?.telefone || '',
     ativo: profile?.ativo ?? true
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canEditRole = profile?.tipoAcesso === 'Diretoria' || profile?.tipoAcesso === 'Administrativo';
+  const canEditRoleAndStatus = profile?.tipoAcesso === 'Diretoria';
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '---';
@@ -200,6 +201,24 @@ export function Profile() {
                   </div>
 
                   <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label>
+                    <input 
+                      type="text"
+                      value={formData.telefone}
+                      onChange={(e) => {
+                        let value = e.target.value.replace(/\D/g, '');
+                        if (value.length > 11) value = value.slice(0, 11);
+                        let masked = value;
+                        if (value.length > 2) masked = `(${value.slice(0, 2)}) ${value.slice(2)}`;
+                        if (value.length > 7) masked = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
+                        setFormData(prev => ({ ...prev, telefone: masked }));
+                      }}
+                      placeholder="(xx) xxxxx-xxxx"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand/20 transition-all font-bold outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Naipe</label>
                     <input 
                       type="text"
@@ -213,7 +232,7 @@ export function Profile() {
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Função (tipoAcesso)</label>
                     <select 
-                      disabled={!canEditRole}
+                      disabled={!canEditRoleAndStatus}
                       value={formData.tipoAcesso}
                       onChange={(e) => setFormData(prev => ({ ...prev, tipoAcesso: e.target.value }))}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand/20 transition-all font-bold outline-none disabled:opacity-50"
@@ -224,10 +243,10 @@ export function Profile() {
                       <option value="Diretoria">Diretoria</option>
                       <option value="Administrativo">Administrativo</option>
                     </select>
-                    {!canEditRole && <p className="text-[9px] text-slate-400 mt-0.5">* Apenas Diretoria pode alterar funções.</p>}
+                    {!canEditRoleAndStatus && <p className="text-[9px] text-slate-400 mt-0.5">* Apenas Diretoria pode alterar funções.</p>}
                   </div>
 
-                  {canEditRole && (
+                  {canEditRoleAndStatus && (
                     <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
                       <div>
                         <p className="text-xs font-black text-slate-700 uppercase tracking-tight">Status da Conta</p>

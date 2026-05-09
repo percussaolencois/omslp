@@ -24,11 +24,51 @@ export function NaipeManagement() {
   const [newName, setNewName] = useState('');
   const [isSavingNew, setIsSavingNew] = useState(false);
   
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedNaipe, setSelectedNaipe] = useState<Naipe | null>(null);
+  const [naipeDetails, setNaipeDetails] = useState<{members: any[], membersCount: number, partiturasCount: number, repertoriosCount: number}>({members: [], membersCount: 0, partiturasCount: 0, repertoriosCount: 0});
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchNaipes();
   }, []);
+
+  const fetchNaipeDetails = async (naipe: Naipe) => {
+    setSelectedNaipe(naipe);
+    setLoadingDetails(true);
+    setIsModalOpen(true);
+    try {
+      // 1. Members
+      const membersRef = collection(db, 'config', 'naipes', 'lista', naipe.id, 'integrantes');
+      const membersSnapshot = await getDocs(membersRef);
+      const members = membersSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+      
+      // 2. Repertorios count (assuming subcollection under naipe)
+      const repertoiresRef = collection(db, 'config', 'naipes', 'lista', naipe.id, 'repertorios');
+      const repertoiresSnapshot = await getDocs(repertoiresRef);
+
+      // 3. Partituras count (summing across members)
+      let totalPartituras = 0;
+      for (const member of members) {
+          totalPartituras += ((member as any).totalPartituras || 0);
+      }
+
+
+      setNaipeDetails({
+          members: members,
+          membersCount: members.length,
+          partiturasCount: totalPartituras,
+          repertoriosCount: repertoiresSnapshot.size
+      });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingDetails(false);
+    }
+
+  };
 
   const fetchNaipes = async () => {
     setLoading(true);
@@ -228,18 +268,10 @@ export function NaipeManagement() {
                     <div className="w-10 h-10 bg-brand/5 text-brand rounded-lg flex items-center justify-center shrink-0">
                       <Folder size={20} />
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-slate-700 text-sm truncate uppercase tracking-tight">{naipe.naipe}</h3>
-                      <div className="flex items-center gap-2">
-                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">
-                           {naipe.integrantes?.length || 0} Integrantes
-                         </p>
-                         <span className="text-[8px] text-slate-300">•</span>
-                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">
-                           {naipe.repertorios?.length || 0} Repertórios
-                         </p>
+                      <div className="min-w-0" onClick={() => fetchNaipeDetails(naipe)}>
+                         <h3 className="font-bold text-slate-700 text-sm truncate uppercase tracking-tight cursor-pointer hover:text-brand">{naipe.naipe}</h3>
+                         
                       </div>
-                    </div>
                   </div>
 
                   <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -275,6 +307,50 @@ export function NaipeManagement() {
           </div>
         )}
       </div>
+      <AnimatePresence>
+        {isModalOpen && selectedNaipe && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-6 relative z-10 max-h-[80vh] flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-slate-800">{selectedNaipe.naipe}</h2>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg"><X size={20}/></button>
+              </div>
+
+              {loadingDetails ? (
+                <div className="py-20 flex justify-center"><Loader2 size={32} className="animate-spin text-brand" /></div>
+              ) : (
+                <div className="flex-1 overflow-y-auto space-y-6">
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="p-4 bg-slate-50 rounded-2xl text-center"><p className="text-xs font-bold text-slate-400">Integrantes</p><p className="text-lg font-black text-slate-800">{naipeDetails.membersCount}</p></div>
+                        <div className="p-4 bg-slate-50 rounded-2xl text-center"><p className="text-xs font-bold text-slate-400">Partituras</p><p className="text-lg font-black text-slate-800">{naipeDetails.partiturasCount}</p></div>
+                        <div className="p-4 bg-slate-50 rounded-2xl text-center"><p className="text-xs font-bold text-slate-400">Repertorios</p><p className="text-lg font-black text-slate-800">{naipeDetails.repertoriosCount}</p></div>
+                    </div>
+                    
+                    <div>
+                        <h4 className="font-bold text-slate-700 mb-3">Integrantes</h4>
+                        <div className="space-y-2">
+                            {naipeDetails.members.map(m => (
+                                <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100">
+                                    <img src={m.fotoUrl} className="w-10 h-10 rounded-lg object-cover" alt={m.Nome}/>
+                                    <span className="font-bold text-sm text-slate-700">{m.Nome}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
