@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile((prev: any) => ({ ...prev, ...data }));
   };
 
-  const isAdmin = profile?.tipoAcesso === 'Administrativo' || profile?.tipoAcesso === 'Diretoria' || user?.email === 'percussaolencois@gmail.com';
+  const isAdmin = ['Administrativo', 'Diretoria', 'Maestro'].includes(profile?.tipoAcesso || '') || user?.email === 'percussaolencois@gmail.com';
 
   return (
     <AuthContext.Provider value={{ 

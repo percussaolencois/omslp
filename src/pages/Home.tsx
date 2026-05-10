@@ -176,7 +176,7 @@ export function Home() {
           <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-emerald-100 rounded-full blur-2xl opacity-50 pointer-events-none"></div>
         </motion.div>
 
-        {isAdmin && profile?.tipoAcesso !== 'Músico' && (
+        {(isAdmin || profile?.tipoAcesso === 'Chefe de Naipe') && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -200,7 +200,7 @@ export function Home() {
       </div>
 
       {/* Admin Operations Section */}
-      {isAdmin && profile?.tipoAcesso !== 'Músico' && (
+      {(isAdmin || profile?.tipoAcesso === 'Chefe de Naipe') && (
         <motion.div
            initial={{ opacity: 0, scale: 0.98 }}
            animate={{ opacity: 1, scale: 1 }}
@@ -218,15 +218,24 @@ export function Home() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link to="/gerenciamento-grades" className="bg-slate-100 text-slate-700 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">
-                Gerir Grades
-              </Link>
+              {['Administrativo', 'Diretoria', 'Maestro'].includes(profile?.tipoAcesso || '') && (
+                <Link to="/gerenciamento-grades" className="bg-slate-100 text-slate-700 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">
+                  Gerir Grades
+                </Link>
+              )}
               <Link to="/servicos/partituras" className="bg-slate-100 text-slate-700 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">
                 Distribuir a Naipes
               </Link>
-              <Link to="/gerenciamento-musicos" className="bg-brand text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-brand-light shadow-lg hover:shadow-brand/30 transition-all">
-                Aprovar Músicos
-              </Link>
+              {profile?.tipoAcesso === 'Chefe de Naipe' && (
+                <Link to="/meu-naipe" className="bg-brand text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-brand-light shadow-lg hover:shadow-brand/30 transition-all">
+                  Aprovar Músicos
+                </Link>
+              )}
+              {['Administrativo', 'Diretoria', 'Maestro'].includes(profile?.tipoAcesso || '') && (
+                <Link to="/gerenciamento-musicos" className="bg-brand text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-brand-light shadow-lg hover:shadow-brand/30 transition-all">
+                  Gerenciar Músicos
+                </Link>
+              )}
             </div>
           </div>
         </motion.div>

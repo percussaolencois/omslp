@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   User, 
@@ -16,13 +16,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { storage, db } from '../lib/firebase';
 import { cn } from '../lib/utils';
 
 export function Profile() {
   const { profile, updateProfileData, isAdmin } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [naipes, setNaipes] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     Nome: profile?.Nome || '',
     naipe: profile?.naipe || '',
@@ -33,6 +35,24 @@ export function Profile() {
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchNaipes = async () => {
+      try {
+        const naipesRef = collection(db, 'config', 'naipes', 'lista');
+        const querySnapshot = await getDocs(naipesRef);
+        const naipesList = querySnapshot.docs
+          .map(doc => doc.data().naipe as string)
+          .filter(Boolean);
+        // Remove duplicates and sort
+        setNaipes(Array.from(new Set(naipesList)).sort());
+      } catch (error) {
+        console.error("Erro ao carregar naipes:", error);
+      }
+    };
+
+    fetchNaipes();
+  }, []);
 
   const canEditRoleAndStatus = profile?.tipoAcesso === 'Diretoria';
 
@@ -220,13 +240,19 @@ export function Profile() {
 
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Naipe</label>
-                    <input 
-                      type="text"
+                    <select 
                       value={formData.naipe}
                       onChange={(e) => setFormData(prev => ({ ...prev, naipe: e.target.value }))}
-                      placeholder="Ex: Madeiras / Sax Altista"
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand/20 transition-all font-bold outline-none"
-                    />
+                    >
+                      <option value="">Selecione um naipe</option>
+                      {naipes.map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                      {!naipes.includes(formData.naipe) && formData.naipe && (
+                        <option value={formData.naipe}>{formData.naipe} (Atual)</option>
+                      )}
+                    </select>
                   </div>
 
                   <div className="space-y-1.5">
