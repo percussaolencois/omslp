@@ -93,6 +93,7 @@ interface MusicNotebookProps {
   onClose: () => void;
   title: string;
   notebookId?: string;
+  onSaveAsNew?: (pages: NotebookPage[], annotations: any) => Promise<void>;
 }
 
 interface SortableNavCardProps {
@@ -148,7 +149,7 @@ const SortableNavCard: React.FC<SortableNavCardProps> = ({ id, page, index, onRe
   );
 };
 
-export function MusicNotebook({ initialPages, availablePartituras, onClose, title, notebookId }: MusicNotebookProps) {
+export function MusicNotebook({ initialPages, availablePartituras, onClose, title, notebookId, onSaveAsNew }: MusicNotebookProps) {
   const { user } = useAuth();
   const [pages, setPages] = useState<NotebookPage[]>(initialPages);
   const [annotations, setAnnotations] = useState<PageAnnotation>({});
@@ -289,6 +290,22 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
     }
 
     setIsSaving(true);
+    
+    // Validate if pages have been added
+    const pagesChanged = JSON.stringify(pages) !== JSON.stringify(initialPages);
+    
+    if (pagesChanged && onSaveAsNew) {
+      try {
+        await onSaveAsNew(pages, annotations);
+        alert('Uma nova partitura com suas modificações foi criada na sua lista de músicas!');
+      } catch (error) {
+        console.error("Erro ao salvar como novo", error);
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     const baseId = notebookId || title.replace(/\s+/g, '_');
     const saveId = `${auth.currentUser.uid}_${baseId}`;
     const path = `notebook_saves/${saveId}`;
@@ -400,7 +417,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
             initial={{ x: -100, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -100, opacity: 0 }}
-            className="fixed left-0 top-0 bottom-0 w-12 sm:w-14 bg-slate-900/95 backdrop-blur-md border-r border-slate-800 flex flex-col items-center py-4 shrink-0 z-[100] shadow-2xl"
+            className="fixed left-0 top-0 bottom-0 w-12 sm:w-14 bg-slate-900/95 backdrop-blur-md border-r border-slate-800 flex flex-col items-center py-4 shrink-0 z-[100] shadow-2xl overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           >
             <div className="flex flex-col gap-2 flex-1">
               {/* Modo de Navegação (Essencial para Scroll) */}
@@ -434,7 +451,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -10 }}
-                        className="absolute left-[120%] top-0 bg-slate-900/98 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-6 z-50 w-64"
+                        className="fixed left-16 top-1/2 -translate-y-1/2 bg-slate-900/98 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-6 z-50 w-64"
                       >
                          <h4 className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400">Configurações do Lápis</h4>
                          
@@ -508,7 +525,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -10 }}
-                        className="absolute left-[120%] top-0 bg-slate-900/98 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-6 z-50 w-64"
+                        className="fixed left-16 top-1/2 -translate-y-1/2 bg-slate-900/98 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-6 z-50 w-64"
                       >
                          <h4 className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400">Configurações do Marcador</h4>
                          
@@ -605,17 +622,6 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
                 className="p-2 text-slate-500 hover:text-white transition-all active:scale-90"
               >
                 <ZoomOut size={18} />
-              </button>
-              
-              <div className="my-2 border-t border-slate-800/50 w-6 mx-auto" />
-
-              {/* 6: Botão Voltar */}
-              <button 
-                onClick={onClose}
-                className="p-2.5 bg-red-500 text-white hover:bg-red-600 rounded-xl transition-all shadow-lg shadow-red-500/20 active:scale-90"
-                title="Sair do Caderno"
-              >
-                <ArrowLeft size={18} />
               </button>
             </div>
           </motion.aside>
@@ -718,41 +724,50 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
              <div className="flex flex-col gap-2 pointer-events-auto">
                 {!isFullScreen && (
                   <>
+                    {/* 0: Voltar */}
+                    <button 
+                      onClick={onClose}
+                      className="p-2 bg-red-500 text-white rounded-full shadow-xl hover:bg-red-600 hover:scale-110 active:scale-95 transition-all outline-none border border-red-500/20"
+                      title="Sair do Caderno"
+                    >
+                      <ArrowLeft size={16} />
+                    </button>
+
                     {/* 1: Adicionar Partitura */}
                     <button 
                       onClick={() => setShowAddMenu(true)}
-                      className="p-3 bg-white/90 backdrop-blur text-slate-800 rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-white/20"
+                      className="p-2 bg-white/90 backdrop-blur text-slate-800 rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-white/20"
                       title="Adicionar Partitura"
                     >
-                      <Plus size={20} />
+                      <Plus size={16} />
                     </button>
 
                     {/* 2: Ordenador de Páginas */}
                     <button 
                       onClick={() => setShowOrganizer(!showOrganizer)}
-                      className={`p-3 backdrop-blur rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border ${showOrganizer ? 'bg-brand text-white border-brand/20' : 'bg-white/90 text-slate-800 border-white/20'}`}
+                      className={`p-2 backdrop-blur rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border ${showOrganizer ? 'bg-brand text-white border-brand/20' : 'bg-white/90 text-slate-800 border-white/20'}`}
                       title="Ordenar Páginas"
                     >
-                      <List size={20} />
+                      <List size={16} />
                     </button>
 
                     {/* 3: Mostrar/Esconder Ferramentas */}
                     <button 
                       onClick={() => setShowControls(!showControls)}
-                      className="p-3 bg-slate-900/90 backdrop-blur text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-slate-700"
+                      className="p-2 bg-slate-900/90 backdrop-blur text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-slate-700"
                       title={showControls ? "Esconder Ferramentas" : "Mostrar Ferramentas"}
                     >
-                      {showControls ? <ArrowLeft size={20} /> : <MousePointer2 size={20} />}
+                      {showControls ? <ArrowLeft size={16} /> : <MousePointer2 size={16} />}
                     </button>
 
                     {/* 4: Salvar */}
                     <button 
                       disabled={isSaving}
-                      className={`p-3 text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-brand/20 shadow-brand/40 ${isSaving ? 'bg-brand/50 cursor-wait' : 'bg-brand'}`}
+                      className={`p-2 text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border border-brand/20 shadow-brand/40 ${isSaving ? 'bg-brand/50 cursor-wait' : 'bg-brand'}`}
                       onClick={handleSave}
                       title="Salvar"
                     >
-                      <Save size={20} className={isSaving ? 'animate-pulse' : ''} />
+                      <Save size={16} className={isSaving ? 'animate-pulse' : ''} />
                     </button>
                   </>
                 )}
@@ -760,10 +775,10 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
                 {/* 5: Tela Cheia */}
                 <button 
                   onClick={() => setIsFullScreen(!isFullScreen)}
-                  className={`p-3 backdrop-blur rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border ${isFullScreen ? 'bg-brand text-white border-brand/20' : 'bg-slate-900/90 text-white border-slate-700'}`}
+                  className={`p-2 backdrop-blur rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all border ${isFullScreen ? 'bg-brand text-white border-brand/20' : 'bg-slate-900/90 text-white border-slate-700'}`}
                   title={isFullScreen ? "Sair da Tela Cheia" : "Tela Cheia"}
                 >
-                   {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                   {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>
              </div>
         </div>

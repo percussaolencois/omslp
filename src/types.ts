@@ -3,6 +3,7 @@ export interface Partitura {
   titulo?: string;
   pdfUrl?: string;
   pagSelecionadas?: number[];
+  pages?: NotebookPage[];
 }
 
 export interface NotebookPage {
