@@ -133,6 +133,12 @@ service cloud.firestore {
       allow create, update, delete: if canManageGrades();
     }
 
+    // Comunicados Collection
+    match /comunicados/{comunicadoId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if canManageGrades();
+    }
+
     // Config Collection (Naipes, Integrantes, Repertórios)
     match /config/visualizador/usuarios/{userId} {
       allow get: if isAtivo() && isOwner(userId);
