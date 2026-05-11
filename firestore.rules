@@ -74,6 +74,14 @@ service cloud.firestore {
              data.pages is list && data.pages.size() <= 200;
     }
 
+    function isValidVisualizadorConfig(data) {
+      return data.keys().hasAll(['pencilColor', 'pencilWidth', 'highlighterColor', 'highlighterWidth']) &&
+             data.pencilColor is string && data.pencilColor.size() <= 10 &&
+             data.pencilWidth is number &&
+             data.highlighterColor is string && data.highlighterColor.size() <= 10 &&
+             data.highlighterWidth is number;
+    }
+
     // --- Rules ---
 
     // Users Collection
@@ -116,6 +124,11 @@ service cloud.firestore {
     }
 
     // Config Collection (Naipes, Integrantes, Repertórios)
+    match /config/visualizador/usuarios/{userId} {
+      allow get: if isAtivo() && isOwner(userId);
+      allow create, update: if isAtivo() && isOwner(userId) && isValidVisualizadorConfig(request.resource.data);
+    }
+
     match /config/naipes/lista/{naipeId} {
       allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();

@@ -76,6 +76,19 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "notebookTitle", "pages", "annotations"]
+    },
+    "VisualizadorConfig": {
+      "title": "Visualizador Config",
+      "description": "User preferences for the visualizador tools",
+      "type": "object",
+      "properties": {
+        "pencilColor": { "type": "string" },
+        "pencilWidth": { "type": "number" },
+        "highlighterColor": { "type": "string" },
+        "highlighterWidth": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["pencilColor", "pencilWidth", "highlighterColor", "highlighterWidth"]
     }
   },
   "firestore": {
@@ -109,6 +122,10 @@
         }
       },
       "description": "Subcollection of instrument category documents (naipes)"
+    },
+    "config/visualizador/usuarios": {
+      "schema": "VisualizadorConfig",
+      "description": "User preferences for the visualizador"
     }
   }
 }

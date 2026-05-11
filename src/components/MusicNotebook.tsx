@@ -45,6 +45,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Partitura, NotebookPage, Stroke } from '../types';
 import { db, auth } from '../lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
 
 // Initialize PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -148,19 +149,85 @@ const SortableNavCard: React.FC<SortableNavCardProps> = ({ id, page, index, onRe
 };
 
 export function MusicNotebook({ initialPages, availablePartituras, onClose, title, notebookId }: MusicNotebookProps) {
+  const { user } = useAuth();
   const [pages, setPages] = useState<NotebookPage[]>(initialPages);
   const [annotations, setAnnotations] = useState<PageAnnotation>({});
   const [tool, setTool] = useState<'pencil' | 'highlighter' | 'eraser' | 'none'>('none');
-  const [activeColor, setActiveColor] = useState('#000000');
-  const [activeWidth, setActiveWidth] = useState(3);
+  const [pencilColor, setPencilColor] = useState('#000000');
+  const [pencilWidth, setPencilWidth] = useState(3);
+  const [highlighterColor, setHighlighterColor] = useState('#fef08a');
+  const [highlighterWidth, setHighlighterWidth] = useState(20);
+
+  const activeColor = tool === 'highlighter' ? highlighterColor : pencilColor;
+  const activeWidth = tool === 'highlighter' ? highlighterWidth : pencilWidth;
+
+  const savePreferences = async (updates: Record<string, any>) => {
+    if (!user?.uid) return;
+    try {
+      await setDoc(doc(db, 'config', 'visualizador', 'usuarios', user.uid), {
+        pencilColor,
+        pencilWidth,
+        highlighterColor,
+        highlighterWidth,
+        updatedAt: new Date().toISOString(),
+        ...updates
+      }, { merge: true });
+    } catch (error: any) {
+      console.error('Error saving visualizador preferences:', error);
+      alert('Error saving preferences: ' + error.message);
+    }
+  };
+
+  const handleSetColor = (color: string) => {
+    if (tool === 'highlighter') {
+      setHighlighterColor(color);
+      savePreferences({ highlighterColor: color });
+    } else {
+      setPencilColor(color);
+      savePreferences({ pencilColor: color });
+    }
+  };
+
+  const handleSetWidth = (width: number) => {
+    if (tool === 'highlighter') {
+      setHighlighterWidth(width);
+      savePreferences({ highlighterWidth: width });
+    } else {
+      setPencilWidth(width);
+      savePreferences({ pencilWidth: width });
+    }
+  };
+
   const [scale, setScale] = useState(1.0);
   const [containerWidth, setContainerWidth] = useState(window.innerWidth);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showPencilSettings, setShowPencilSettings] = useState(false);
+  const [showHighlighterSettings, setShowHighlighterSettings] = useState(false);
   const [showOrganizer, setShowOrganizer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const loadPreferences = async () => {
+      if (!user?.uid) return;
+      try {
+        const docSnap = await getDoc(doc(db, 'config', 'visualizador', 'usuarios', user.uid));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.pencilColor) setPencilColor(data.pencilColor);
+          if (data.pencilWidth) setPencilWidth(data.pencilWidth);
+          if (data.highlighterColor) setHighlighterColor(data.highlighterColor);
+          if (data.highlighterWidth) setHighlighterWidth(data.highlighterWidth);
+        }
+      } catch (error: any) {
+        console.error('Error loading visualizador preferences:', error);
+        alert('Error loading preferences: ' + error.message);
+      }
+    };
+    loadPreferences();
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!mainRef.current) return;
@@ -347,19 +414,153 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
               <div className="my-2 border-t border-slate-800/50 w-6 mx-auto" />
 
               {/* 1: Lápis */}
-              <ToolButton 
-                active={tool === 'pencil'} 
-                onClick={() => setTool('pencil')}
-                icon={<Pencil size={18} />}
-                compact
-              />
+              <div className="relative">
+                <ToolButton 
+                  active={tool === 'pencil'} 
+                  onClick={() => setTool('pencil')}
+                  onLongPress={() => {
+                    setTool('pencil');
+                    setShowPencilSettings(true);
+                  }}
+                  icon={<Pencil size={18} />}
+                  compact
+                />
+                
+                <AnimatePresence>
+                  {showPencilSettings && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowPencilSettings(false)} />
+                      <motion.div 
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        className="absolute left-[120%] top-0 bg-slate-900/98 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-6 z-50 w-64"
+                      >
+                         <h4 className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400">Configurações do Lápis</h4>
+                         
+                         {/* Thickness */}
+                         <div className="space-y-4">
+                           <div className="flex justify-between items-center text-xs font-bold text-slate-300">
+                             <span>Espessura</span>
+                             <span className="text-brand">{activeWidth}px</span>
+                           </div>
+                           <input 
+                             type="range" 
+                             min={1} 
+                             max={20} 
+                             value={activeWidth}
+                             onChange={(e) => handleSetWidth(Number(e.target.value))}
+                             className="w-full accent-brand outline-none"
+                           />
+                         </div>
+
+                         {/* Colors */}
+                         <div className="space-y-3">
+                           <span className="text-xs font-bold text-slate-300">Cores Rápidas</span>
+                           <div className="flex flex-wrap gap-3">
+                             <ColorCircle color="#000000" active={activeColor === '#000000'} onClick={() => handleSetColor('#000000')} />
+                             <ColorCircle color="#ffffff" active={activeColor === '#ffffff'} onClick={() => handleSetColor('#ffffff')} />
+                             <ColorCircle color="#ef4444" active={activeColor === '#ef4444'} onClick={() => handleSetColor('#ef4444')} />
+                             <ColorCircle color="#3b82f6" active={activeColor === '#3b82f6'} onClick={() => handleSetColor('#3b82f6')} />
+                             <ColorCircle color="#22c55e" active={activeColor === '#22c55e'} onClick={() => handleSetColor('#22c55e')} />
+                             <ColorCircle color="#eab308" active={activeColor === '#eab308'} onClick={() => handleSetColor('#eab308')} />
+                             <ColorCircle color="#a855f7" active={activeColor === '#a855f7'} onClick={() => handleSetColor('#a855f7')} />
+                             
+                             <div className="relative group/color-picker flex-shrink-0">
+                                <div 
+                                 className="w-8 h-8 rounded-full border border-slate-700 flex items-center justify-center overflow-hidden shadow-inner"
+                                 style={{ backgroundColor: activeColor }}
+                                >
+                                  <input 
+                                   type="color" 
+                                   value={activeColor} 
+                                   onChange={(e) => handleSetColor(e.target.value)}
+                                   className="w-12 h-12 cursor-pointer border-none bg-transparent opacity-0 absolute inset-0" 
+                                  />
+                                </div>
+                             </div>
+                           </div>
+                         </div>
+
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
               {/* 2: Marcador */}
-              <ToolButton 
-                active={tool === 'highlighter'} 
-                onClick={() => setTool('highlighter')}
-                icon={<Highlighter size={18} />}
-                compact
-              />
+              <div className="relative">
+                <ToolButton 
+                  active={tool === 'highlighter'} 
+                  onClick={() => setTool('highlighter')}
+                  onLongPress={() => {
+                    setTool('highlighter');
+                    setShowHighlighterSettings(true);
+                  }}
+                  icon={<Highlighter size={18} />}
+                  compact
+                />
+                
+                <AnimatePresence>
+                  {showHighlighterSettings && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowHighlighterSettings(false)} />
+                      <motion.div 
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        className="absolute left-[120%] top-0 bg-slate-900/98 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-6 z-50 w-64"
+                      >
+                         <h4 className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400">Configurações do Marcador</h4>
+                         
+                         {/* Thickness */}
+                         <div className="space-y-4">
+                           <div className="flex justify-between items-center text-xs font-bold text-slate-300">
+                             <span>Espessura</span>
+                             <span className="text-brand">{activeWidth}px</span>
+                           </div>
+                           <input 
+                             type="range" 
+                             min={5} 
+                             max={50} 
+                             value={activeWidth}
+                             onChange={(e) => handleSetWidth(Number(e.target.value))}
+                             className="w-full accent-brand outline-none"
+                           />
+                         </div>
+
+                         {/* Colors */}
+                         <div className="space-y-3">
+                           <span className="text-xs font-bold text-slate-300">Cores Rápidas</span>
+                           <div className="flex flex-wrap gap-3">
+                             <ColorCircle color="#fef08a" active={activeColor === '#fef08a'} onClick={() => handleSetColor('#fef08a')} />
+                             <ColorCircle color="#bbf7d0" active={activeColor === '#bbf7d0'} onClick={() => handleSetColor('#bbf7d0')} />
+                             <ColorCircle color="#bfdbfe" active={activeColor === '#bfdbfe'} onClick={() => handleSetColor('#bfdbfe')} />
+                             <ColorCircle color="#fbcfe8" active={activeColor === '#fbcfe8'} onClick={() => handleSetColor('#fbcfe8')} />
+                             <ColorCircle color="#e9d5ff" active={activeColor === '#e9d5ff'} onClick={() => handleSetColor('#e9d5ff')} />
+                             <ColorCircle color="#fed7aa" active={activeColor === '#fed7aa'} onClick={() => handleSetColor('#fed7aa')} />
+                             <ColorCircle color="#99f6e4" active={activeColor === '#99f6e4'} onClick={() => handleSetColor('#99f6e4')} />
+                             
+                             <div className="relative group/color-picker flex-shrink-0">
+                                <div 
+                                 className="w-8 h-8 rounded-full border border-slate-700 flex items-center justify-center overflow-hidden shadow-inner"
+                                 style={{ backgroundColor: activeColor }}
+                                >
+                                  <input 
+                                   type="color" 
+                                   value={activeColor} 
+                                   onChange={(e) => handleSetColor(e.target.value)}
+                                   className="w-12 h-12 cursor-pointer border-none bg-transparent opacity-0 absolute inset-0" 
+                                  />
+                                </div>
+                             </div>
+                           </div>
+                         </div>
+
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
               {/* 3: Borracha */}
               <ToolButton 
                 active={tool === 'eraser'} 
@@ -372,9 +573,9 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
 
               {/* 4: Seletor de Cores */}
               <div className="flex flex-col gap-2 items-center">
-                <ColorCircle color="#000000" active={activeColor === '#000000'} onClick={() => setActiveColor('#000000')} compact />
-                <ColorCircle color="#ef4444" active={activeColor === '#ef4444'} onClick={() => setActiveColor('#ef4444')} compact />
-                <ColorCircle color="#3b82f6" active={activeColor === '#3b82f6'} onClick={() => setActiveColor('#3b82f6')} compact />
+                <ColorCircle color="#000000" active={activeColor === '#000000'} onClick={() => handleSetColor('#000000')} compact />
+                <ColorCircle color="#ef4444" active={activeColor === '#ef4444'} onClick={() => handleSetColor('#ef4444')} compact />
+                <ColorCircle color="#3b82f6" active={activeColor === '#3b82f6'} onClick={() => handleSetColor('#3b82f6')} compact />
                 <div className="relative group/color-picker">
                    <div 
                     className="w-6 h-6 rounded-full border border-slate-700 flex items-center justify-center overflow-hidden shadow-inner"
@@ -383,7 +584,7 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
                      <input 
                       type="color" 
                       value={activeColor} 
-                      onChange={(e) => setActiveColor(e.target.value)}
+                      onChange={(e) => handleSetColor(e.target.value)}
                       className="w-10 h-10 cursor-pointer border-none bg-transparent opacity-0 absolute inset-0" 
                      />
                    </div>
@@ -673,10 +874,36 @@ export function MusicNotebook({ initialPages, availablePartituras, onClose, titl
   );
 }
 
-function ToolButton({ active, onClick, icon, label, compact }: { active: boolean, onClick: () => void, icon: React.ReactNode, label?: string, compact?: boolean }) {
+function ToolButton({ active, onClick, icon, label, compact, onLongPress }: { active: boolean, onClick: () => void, icon: React.ReactNode, label?: string, compact?: boolean, onLongPress?: () => void }) {
+  const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null);
+
+  const startPress = () => {
+    if (onLongPress) {
+      const timer = setTimeout(() => {
+        onLongPress();
+      }, 500); // 500ms para long press
+      setPressTimer(timer);
+    }
+  };
+
+  const cancelPress = () => {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      setPressTimer(null);
+    }
+  };
+
   return (
     <button 
       onClick={onClick}
+      onPointerDown={startPress}
+      onPointerUp={cancelPress}
+      onPointerLeave={cancelPress}
+      onContextMenu={(e) => {
+        if (onLongPress) {
+          e.preventDefault();
+        }
+      }}
       className={`
         flex flex-col items-center justify-center gap-1 p-2 sm:p-3 rounded-xl sm:rounded-2xl transition-all duration-300
         ${active ? 'bg-brand text-white shadow-xl shadow-brand/30 scale-105' : 'text-slate-400 hover:text-white hover:bg-slate-800'}
