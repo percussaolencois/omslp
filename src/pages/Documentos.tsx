@@ -106,7 +106,7 @@ export function Documentos() {
             onClick={() => {
               setEditingDoc({ 
                 ativo: true,
-                tipo: 'Arquivo'
+                tipo: ''
               });
               setIsModalOpen(true);
             }}
