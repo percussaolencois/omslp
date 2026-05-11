@@ -295,6 +295,46 @@ export function MyMusic() {
             <p className="text-slate-400 text-sm">Este repertório não possui partituras atribuídas ou sua busca não retornou resultados.</p>
           </div>
         )}
+
+      {renamingPartitura && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden"
+          >
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 tracking-tight">Renomear Partitura</h3>
+              <input 
+                type="text"
+                autoFocus
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleRename();
+                  if (e.key === 'Escape') setRenamingPartitura(null);
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all text-slate-700 font-medium"
+                placeholder="Novo título..."
+              />
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+               <button 
+                 onClick={() => setRenamingPartitura(null)}
+                 className="px-4 py-2 font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 onClick={handleRename}
+                 className="px-4 py-2 font-bold text-white bg-brand hover:bg-brand/90 rounded-lg shadow-md transition-all active:scale-95"
+               >
+                 Salvar
+               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       </div>
     );
   }
@@ -368,46 +408,6 @@ export function MyMusic() {
           </div>
           <h2 className="text-xl font-bold opacity-50 tracking-tight">Nenhum repertório encontrado</h2>
           <p className="text-slate-400 text-sm">Aguarde a distribuição da diretoria.</p>
-        </div>
-      )}
-
-      {renamingPartitura && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden"
-          >
-            <div className="p-6">
-              <h3 className="text-lg font-bold text-slate-800 mb-4 tracking-tight">Renomear Partitura</h3>
-              <input 
-                type="text"
-                autoFocus
-                value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleRename();
-                  if (e.key === 'Escape') setRenamingPartitura(null);
-                }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all text-slate-700 font-medium"
-                placeholder="Novo título..."
-              />
-            </div>
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-               <button 
-                 onClick={() => setRenamingPartitura(null)}
-                 className="px-4 py-2 font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
-               >
-                 Cancelar
-               </button>
-               <button 
-                 onClick={handleRename}
-                 className="px-4 py-2 font-bold text-white bg-brand hover:bg-brand/90 rounded-lg shadow-md transition-all active:scale-95"
-               >
-                 Salvar
-               </button>
-            </div>
-          </motion.div>
         </div>
       )}
     </div>
