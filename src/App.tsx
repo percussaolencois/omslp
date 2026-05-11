@@ -20,6 +20,9 @@ import { UserManagement } from './pages/UserManagement';
 import { MeuNaipe } from './pages/MeuNaipe';
 import { Profile } from './pages/Profile';
 import { Register } from './pages/Register';
+import { Agenda } from './pages/Agenda';
+import { Comunicados } from './pages/Comunicados';
+import { Documentos } from './pages/Documentos';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -54,6 +57,10 @@ export default function App() {
           <Route path="/gerenciamento-musicos" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
           <Route path="/meu-naipe" element={<PrivateRoute><MeuNaipe /></PrivateRoute>} />
           <Route path="/perfil" element={<PrivateRoute><Profile /></PrivateRoute>} />
+
+          <Route path="/secretaria/agenda" element={<PrivateRoute><Agenda /></PrivateRoute>} />
+          <Route path="/secretaria/comunicados" element={<PrivateRoute><Comunicados /></PrivateRoute>} />
+          <Route path="/secretaria/documentos" element={<PrivateRoute><Documentos /></PrivateRoute>} />
           
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

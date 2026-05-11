@@ -12,7 +12,11 @@ import {
   Send,
   LogOut,
   PlusCircle,
-  FileStack
+  FileStack,
+  Briefcase,
+  Calendar,
+  MessageSquare,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -86,6 +90,16 @@ export function Navbar() {
         { label: 'Músicos', path: '/gerenciamento-musicos', icon: User, visible: isDocOrAdmin },
         { label: 'Meu Naipe', path: '/meu-naipe', icon: User, visible: isChefDeNaipe }
       ].filter(sub => sub.visible !== false)
+    },
+    {
+      label: 'Secretária',
+      path: '#',
+      icon: Briefcase,
+      submenu: [
+        { label: 'Agenda', path: '/secretaria/agenda', icon: Calendar },
+        { label: 'Comunicados', path: '/secretaria/comunicados', icon: MessageSquare },
+        { label: 'Documentos', path: '/secretaria/documentos', icon: FileText }
+      ]
     },
     { label: 'Meu Perfil', path: '/perfil', icon: User },
   ].filter(item => (!item.submenu || item.submenu.length > 0) && item.visible !== false);
