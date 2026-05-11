@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { 
-  Plus, Edit2, Trash2, X, AlertTriangle, Info, Clock
+  Plus, Edit2, Trash2, X, AlertTriangle, Info, Clock, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -15,9 +15,11 @@ export interface Comunicado {
   id: string;
   titulo: string;
   descricao: string;
+  anexo?: string;
   createdAt: any; 
   dataExpiracao: string; // YYYY-MM-DDTHH:mm
   prioridade: string; // "Normal" | "Urgente"
+  status?: string;
 }
 
 export function Comunicados() {
@@ -25,6 +27,7 @@ export function Comunicados() {
   const canManageComunicados = ['Administrativo', 'Diretoria', 'Maestro'].includes(profile?.tipoAcesso || '');
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
 
   // Modals
   const [editingComunicado, setEditingComunicado] = useState<Partial<Comunicado> | null>(null);
@@ -40,6 +43,21 @@ export function Comunicados() {
     return () => unsub();
   }, [user]);
 
+  // Archiving
+  useEffect(() => {
+    if (!canManageComunicados || !comunicados.length) return;
+    const now = new Date();
+    
+    comunicados.forEach(c => {
+      if (c.status !== 'arquivado' && c.dataExpiracao) {
+        const expDate = parseISO(c.dataExpiracao);
+        if (isBefore(expDate, now)) {
+          updateDoc(doc(db, 'comunicados', c.id), { status: 'arquivado' }).catch(console.error);
+        }
+      }
+    });
+  }, [comunicados, canManageComunicados]);
+
   const handleSaveComunicado = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingComunicado || !editingComunicado.titulo || !editingComunicado.descricao || !editingComunicado.dataExpiracao) return;
@@ -53,6 +71,7 @@ export function Comunicados() {
         await addDoc(collection(db, 'comunicados'), {
           ...editingComunicado,
           prioridade: editingComunicado.prioridade || 'Normal',
+          status: editingComunicado.status || 'ativo',
           createdAt: serverTimestamp()
         });
       }
@@ -77,9 +96,12 @@ export function Comunicados() {
   const now = new Date();
   const activeComunicados = comunicados
     .filter(c => {
-      if (!c.dataExpiracao) return true;
-      const expDate = parseISO(c.dataExpiracao);
-      return isAfter(expDate, now);
+      if (!showAll && c.status === 'arquivado') return false;
+      if (!showAll && c.dataExpiracao) {
+        const expDate = parseISO(c.dataExpiracao);
+        if (isBefore(expDate, now)) return false;
+      }
+      return true;
     })
     .sort((a, b) => {
         const dateA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
@@ -95,19 +117,27 @@ export function Comunicados() {
           <p className="text-slate-500 font-medium tracking-tight">Mural de recados e avisos gerais</p>
         </div>
         {canManageComunicados && (
-          <button 
-            onClick={() => {
-              setEditingComunicado({ 
-                prioridade: 'Normal',
-                dataExpiracao: format(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm") // default +7 days
-              });
-              setIsModalOpen(true);
-            }}
-            className="flex items-center gap-2 bg-brand text-white px-5 py-2.5 rounded-xl hover:bg-brand/90 transition-all shadow-md font-medium"
-          >
-            <Plus size={20} />
-            Novo Aviso
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className={`px-4 py-2 text-sm font-bold rounded-xl transition-all border ${showAll ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+            >
+              {showAll ? 'Ocultar Arquivados' : 'Mostrar Todos'}
+            </button>
+            <button 
+              onClick={() => {
+                setEditingComunicado({ 
+                  prioridade: 'Normal',
+                  dataExpiracao: format(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm") // default +7 days
+                });
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-2 bg-brand text-white px-5 py-2.5 rounded-xl hover:bg-brand/90 transition-all shadow-md font-medium"
+            >
+              <Plus size={20} />
+              Novo Aviso
+            </button>
+          </div>
         )}
       </header>
 
@@ -204,6 +234,17 @@ export function Comunicados() {
                         placeholder="Detalhes completos do aviso..."
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Link de Anexo (Opcional)</label>
+                      <input 
+                        type="url"
+                        value={editingComunicado.anexo || ''} 
+                        onChange={e => setEditingComunicado({...editingComunicado, anexo: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 font-medium"
+                        placeholder="Ex: https://forms.gle/... ou link para imagem"
+                      />
+                    </div>
                  </form>
                </div>
 
@@ -256,12 +297,19 @@ const ComunicadoCard: React.FC<ComunicadoCardProps> = ({ comunicado, canManage, 
 
 
   return (
-    <div className={`bg-white rounded-2xl border ${isUrgente ? 'border-red-200' : 'border-slate-200'} shadow-sm overflow-hidden group p-5 sm:p-6 transition-all hover:shadow-md relative`}>
-      {isUrgente && (
-          <div className="absolute top-0 right-0 px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-bl-xl flex items-center gap-1">
+    <div className={`bg-white rounded-2xl border ${isUrgente ? 'border-red-200' : 'border-slate-200'} shadow-sm overflow-hidden group p-5 sm:p-6 transition-all hover:shadow-md relative ${comunicado.status === 'arquivado' ? 'opacity-70' : ''}`}>
+      <div className="absolute top-0 right-0 flex">
+        {comunicado.status === 'arquivado' && (
+          <div className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-bl-xl flex items-center gap-1">
+            Arquivado
+          </div>
+        )}
+        {isUrgente && comunicado.status !== 'arquivado' && (
+          <div className="px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-bl-xl flex items-center gap-1">
              <AlertTriangle size={12} /> Urgente
           </div>
-      )}
+        )}
+      </div>
       
       <div className="flex gap-4 sm:gap-5">
          <div className="flex shrink-0 items-start">
@@ -292,6 +340,20 @@ const ComunicadoCard: React.FC<ComunicadoCardProps> = ({ comunicado, canManage, 
             </div>
             
             <p className="text-slate-600 whitespace-pre-wrap mt-2">{comunicado.descricao}</p>
+            
+            {comunicado.anexo && (
+                <div className="mt-4">
+                  <a 
+                    href={comunicado.anexo} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-brand font-medium text-sm rounded-lg transition-colors"
+                  >
+                    <ExternalLink size={16} />
+                    Acessar Anexo / Link
+                  </a>
+                </div>
+            )}
             
             <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-slate-400 pt-3 border-t border-slate-100">
                {creationDateStr && (
