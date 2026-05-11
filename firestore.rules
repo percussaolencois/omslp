@@ -139,6 +139,12 @@ service cloud.firestore {
       allow create, update, delete: if canManageGrades();
     }
 
+    // Documentos Collection
+    match /documentos/{docId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if canManageGrades();
+    }
+
     // Config Collection (Naipes, Integrantes, Repertórios)
     match /config/visualizador/usuarios/{userId} {
       allow get: if isAtivo() && isOwner(userId);
