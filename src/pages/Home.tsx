@@ -97,7 +97,7 @@ export function Home() {
   }, [user]);
 
   const firstName = profile?.Nome?.split(' ')[0] || 'Músico';
-  const roleDisplay = isAdmin ? 'Administrador' : (profile?.tipoAcesso || 'Músico');
+  const roleDisplay = profile?.tipoAcesso || 'Músico';
 
   const quickLinks = [
     { name: 'Agenda', icon: Calendar, path: '/secretaria/agenda', lightColor: 'bg-emerald-50', textColor: 'text-emerald-600' },
