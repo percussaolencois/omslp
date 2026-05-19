@@ -139,6 +139,13 @@ service cloud.firestore {
       allow create, update, delete: if canManageGrades();
     }
 
+    // Justificativas Collection
+    match /justificativas/{justificativaId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if canManageGrades();
+    }
+
     // Documentos Collection
     match /documentos/{docId} {
       allow read: if isSignedIn();

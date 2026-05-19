@@ -23,6 +23,10 @@ import { Register } from './pages/Register';
 import { Agenda } from './pages/Agenda';
 import { Comunicados } from './pages/Comunicados';
 import { Documentos } from './pages/Documentos';
+import { Justificativas } from './pages/Justificativas';
+import { MinhasFaltas } from './pages/MinhasFaltas';
+import { GerenciamentoFaltas } from './pages/GerenciamentoFaltas';
+import { AnaliseFaltas } from './pages/AnaliseFaltas';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -52,15 +56,19 @@ export default function App() {
           <Route path="/servicos/distribuicao" element={<PrivateRoute><Distribution /></PrivateRoute>} />
           <Route path="/servicos/grades" element={<PrivateRoute><ScoreDistribution /></PrivateRoute>} />
           <Route path="/servicos/partituras" element={<PrivateRoute><PartituraManagement /></PrivateRoute>} />
+          <Route path="/servicos/faltas" element={<PrivateRoute><GerenciamentoFaltas /></PrivateRoute>} />
+          <Route path="/servicos/faltas/analise" element={<PrivateRoute><AnaliseFaltas /></PrivateRoute>} />
           <Route path="/gerenciamento-grades" element={<PrivateRoute><GradesManagement /></PrivateRoute>} />
           <Route path="/gerenciamento-naipes" element={<PrivateRoute><NaipeManagement /></PrivateRoute>} />
           <Route path="/gerenciamento-musicos" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
           <Route path="/meu-naipe" element={<PrivateRoute><MeuNaipe /></PrivateRoute>} />
           <Route path="/perfil" element={<PrivateRoute><Profile /></PrivateRoute>} />
+          <Route path="/minhas-faltas" element={<PrivateRoute><MinhasFaltas /></PrivateRoute>} />
 
           <Route path="/secretaria/agenda" element={<PrivateRoute><Agenda /></PrivateRoute>} />
           <Route path="/secretaria/comunicados" element={<PrivateRoute><Comunicados /></PrivateRoute>} />
           <Route path="/secretaria/documentos" element={<PrivateRoute><Documentos /></PrivateRoute>} />
+          <Route path="/justificativas" element={<PrivateRoute><Justificativas /></PrivateRoute>} />
           
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

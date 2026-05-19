@@ -15,6 +15,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Link } from 'react-router-dom';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, getDocs } from 'firebase/firestore';
 import { storage, db } from '../lib/firebase';
@@ -329,6 +330,10 @@ export function Profile() {
                 Segurança
                 <Shield size={14} className="text-slate-300 group-hover:text-brand transition-colors" />
               </button>
+              <Link to="/minhas-faltas" className="w-full py-3 px-5 bg-white border border-slate-200 rounded-lg font-bold text-xs text-slate-700 hover:border-brand hover:text-brand transition-all flex items-center justify-between group">
+                Minhas Faltas
+                <Calendar size={14} className="text-slate-300 group-hover:text-brand transition-colors" />
+              </Link>
             </div>
           </div>
 

@@ -6,6 +6,7 @@ import {
   Plus, Edit2, Trash2, X, ExternalLink, Link as LinkIcon, FileText, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Link } from 'react-router-dom';
 
 export interface Documento {
   id: string;
@@ -133,9 +134,15 @@ export function Documentos() {
                       <LinkIcon size={20} />
                     </div>
                     <div className="min-w-0">
-                       <a href={docItem.url} target="_blank" rel="noopener noreferrer" className="text-base sm:text-lg font-bold text-slate-800 hover:text-brand transition-colors block truncate">
-                          {docItem.titulo}
-                       </a>
+                       {docItem.url.startsWith('/') ? (
+                         <Link to={docItem.url} className="text-base sm:text-lg font-bold text-slate-800 hover:text-brand transition-colors block truncate">
+                            {docItem.titulo}
+                         </Link>
+                       ) : (
+                         <a href={docItem.url} target="_blank" rel="noopener noreferrer" className="text-base sm:text-lg font-bold text-slate-800 hover:text-brand transition-colors block truncate">
+                            {docItem.titulo}
+                         </a>
+                       )}
                        <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md">
                             {docItem.tipo}
@@ -210,13 +217,13 @@ export function Documentos() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">URL (Link) *</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">URL (Link) ou Atalho *</label>
                       <input 
-                        type="url" required
+                        type="text" required
                         value={editingDoc.url || ''} 
                         onChange={e => setEditingDoc({...editingDoc, url: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 font-medium"
-                        placeholder="https://..."
+                        placeholder="https://... ou /atalho"
                       />
                     </div>
 

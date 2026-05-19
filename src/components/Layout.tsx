@@ -72,6 +72,12 @@ export function Navbar() {
           path: '/servicos/partituras', 
           icon: FileStack,
           visible: canSeePartsDist
+        },
+        {
+          label: 'Controle de Faltas',
+          path: '/servicos/faltas',
+          icon: FileText,
+          visible: isDocOrAdmin
         }
       ].filter(sub => sub.visible !== false)
     },
