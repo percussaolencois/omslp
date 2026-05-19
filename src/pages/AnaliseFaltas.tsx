@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot, getDocs, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowLeft, BarChart3, TrendingUp, Users, Calendar, AlertTriangle, PieChart as PieChartIcon, Download } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { ArrowLeft, BarChart3, TrendingUp, Users, Calendar, AlertTriangle, PieChart as PieChartIcon, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
 import {
   BarChart,
@@ -30,27 +30,75 @@ export function AnaliseFaltas() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(-1); // -1 means all year
   const [isExporting, setIsExporting] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportSelection, setExportSelection] = useState<'pdf' | 'sheets' | null>(null);
 
   const isDocOrAdmin = profile?.tipoAcesso === 'Administrativo' || profile?.tipoAcesso === 'Diretoria';
 
-  const exportPDF = async () => {
+  const handleExportSubmit = async () => {
+    if (!exportSelection) return;
     setIsExporting(true);
+    
     try {
-      const element = document.getElementById('dashboard-content');
-      if (!element) return;
+      const qUsers = query(
+        collection(db, 'users'),
+        where('tipoAcesso', 'in', ['Diretoria', 'Administrativo'])
+      );
+      const userDocs = await getDocs(qUsers);
+      const telefonesAdmins = userDocs.docs
+        .map(doc => doc.data().telefone)
+        .filter(t => t); // Filter out empty or undefined phones
+
+      const payload: any = {
+        origem: "analise-falta",
+        tipo: exportSelection,
+        telefonesAdmins,
+        dadosFaltas: filteredFaltas,
+        dadosAnalise: {
+          periodo: { ano: selectedYear, mes: selectedMonth },
+          total: totalFaltas,
+          validadas: totalValidadas,
+          naoValidadas: totalNaoValidadas,
+          canceladas: totalCanceladas,
+          porStatus: chartDataByStatus,
+          porMes: chartDataByMonth,
+          porMotivo: chartDataByMotivo
+        }
+      };
+
+      if (exportSelection === 'pdf') {
+         const element = document.getElementById('dashboard-content');
+         if (!element) throw new Error('Dashboard não encontrado para gerar PDF');
+         
+         const imgData = await toJpeg(element, { backgroundColor: '#f8fafc', pixelRatio: 1.5, quality: 0.8 });
+         const pdf = new jsPDF('p', 'mm', 'a4');
+         const pdfWidth = pdf.internal.pageSize.getWidth();
+         const pdfHeight = (element.offsetHeight * pdfWidth) / element.offsetWidth;
+         
+         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+         const pdfBase64 = pdf.output('datauristring');
+         payload.base64 = pdfBase64;
+      }
       
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
+      const response = await fetch('https://webhook.ehstech.com.br/webhook/administrativo-omslp', {
+         method: 'POST',
+         headers: {
+            'Content-Type': 'application/json'
+         },
+         body: JSON.stringify(payload)
+      });
       
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`analise-faltas-${selectedYear}${selectedMonth !== -1 ? `-${selectedMonth + 1}` : ''}.pdf`);
+      if (!response.ok) {
+         const errorText = await response.text();
+         throw new Error(`Erro ao enviar para o webhook (${response.status}): ${errorText}`);
+      }
+
+      alert('Exportação enviada com sucesso!');
+      setExportModalOpen(false);
+      setExportSelection(null);
     } catch (err) {
-      console.error('Erro ao exportar PDF:', err);
-      alert('Ocorreu um erro ao gerar o PDF. Tente novamente.');
+      console.error('Erro na exportação:', err);
+      alert('Ocorreu um erro ao exportar. Tente novamente.');
     } finally {
       setIsExporting(false);
     }
@@ -183,16 +231,11 @@ export function AnaliseFaltas() {
         <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
           {!loading && totalFaltas > 0 && (
             <button 
-              onClick={exportPDF}
-              disabled={isExporting}
-              className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl hover:bg-slate-700 transition-all text-sm font-bold disabled:opacity-50"
+              onClick={() => setExportModalOpen(true)}
+              className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl hover:bg-slate-700 transition-all text-sm font-bold"
             >
-              {isExporting ? (
-                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-              ) : (
-                <Download size={16} />
-              )}
-              {isExporting ? 'Gerando...' : 'Exportar'}
+              <Download size={16} />
+              Exportar
             </button>
           )}
           <Link 
@@ -276,8 +319,8 @@ export function AnaliseFaltas() {
                   <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest mb-4 flex items-center gap-2">
                      <PieChartIcon size={16} /> Status das Justificativas
                   </h3>
-                  <div className="flex-1 w-full min-h-[250px]">
-                     <ResponsiveContainer width="100%" height="100%">
+                  <div className="flex-1 w-full min-h-[250px]" style={{ minHeight: 250 }}>
+                     <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                         <PieChart>
                            <Pie
                               data={chartDataByStatus}
@@ -307,8 +350,8 @@ export function AnaliseFaltas() {
                      <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest mb-4 flex items-center gap-2">
                         <TrendingUp size={16} /> Faltas por Mês ({selectedYear})
                      </h3>
-                     <div className="flex-1 w-full min-h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                     <div className="flex-1 w-full min-h-[250px]" style={{ minHeight: 250 }}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                            <BarChart data={chartDataByMonth}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
@@ -329,8 +372,8 @@ export function AnaliseFaltas() {
                   <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest mb-4 flex items-center gap-2">
                      <BarChart3 size={16} /> Tipo de Evento da Falta
                   </h3>
-                  <div className="flex-1 w-full min-h-[250px]">
-                     <ResponsiveContainer width="100%" height="100%">
+                  <div className="flex-1 w-full min-h-[250px]" style={{ minHeight: 250 }}>
+                     <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                         <BarChart data={chartDataByMotivo} layout="vertical">
                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                            <XAxis type="number" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} allowDecimals={false} />
@@ -353,6 +396,58 @@ export function AnaliseFaltas() {
 
              </div>
           )}
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {exportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm relative"
+          >
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Exportar Análise</h2>
+            <p className="text-sm text-slate-500 mb-6">Escolha o formato que deseja exportar os dados desta análise.</p>
+            
+            <div className="grid grid-cols-2 gap-3 mb-6">
+               <button
+                  onClick={() => setExportSelection('pdf')}
+                  className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                     exportSelection === 'pdf' ? 'border-brand bg-brand/5 text-brand' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+               >
+                  <FileText size={24} />
+                  <span className="font-bold text-sm">PDF</span>
+               </button>
+               <button
+                  onClick={() => setExportSelection('sheets')}
+                  className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                     exportSelection === 'sheets' ? 'border-emerald-500 bg-emerald-50 text-emerald-600' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+               >
+                  <FileSpreadsheet size={24} />
+                  <span className="font-bold text-sm">GSheets</span>
+               </button>
+            </div>
+
+            <div className="flex gap-3">
+               <button 
+                  onClick={() => { setExportModalOpen(false); setExportSelection(null); }}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200"
+                  disabled={isExporting}
+               >
+                  Cancelar
+               </button>
+               <button 
+                  onClick={handleExportSubmit}
+                  disabled={!exportSelection || isExporting}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white bg-brand disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+               >
+                  {isExporting ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : 'Confirmar'}
+               </button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>
